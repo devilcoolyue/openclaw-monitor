@@ -1,0 +1,19 @@
+# Runtime
+monitor.pid
+monitor.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / Editor
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

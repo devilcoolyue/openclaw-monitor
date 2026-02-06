@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>openclaw monitor</title>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   Reset & Variables
+   ═══════════════════════════════════════════════════════════ */
+/* Dark theme (default) */
+:root {
+  --bg-0:#0a0e13; --bg-1:#111519; --bg-2:#161b22; --bg-3:#1c2330;
+  --border:#1e2530; --border-hi:#2d3644;
+  --scroll-thumb:#3a4555; --scroll-thumb-hi:#4f5d73;
+  --t0:#e6edf3; --t1:#c9d1d9; --t2:#8b949e; --t3:#6e7681;
+  --accent:#58a6ff; --green:#3fb950; --green2:#56d364;
+  --orange:#ffa657; --purple:#bc8cff; --red:#ff7b72; --yellow:#e3b341;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-0:#f6f8fa; --bg-1:#ffffff; --bg-2:#f0f3f6; --bg-3:#e8ebef;
+  --border:#d0d7de; --border-hi:#afb8c1;
+  --scroll-thumb:#afb8c1; --scroll-thumb-hi:#8c959f;
+  --t0:#1f2328; --t1:#31363f; --t2:#57606a; --t3:#6e7781;
+  --accent:#0969da; --green:#1a7f37; --green2:#2da44e;
+  --orange:#bc4c00; --purple:#8250df; --red:#cf222e; --yellow:#9a6700;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'SF Mono','Fira Code','Consolas','Courier New',monospace;
+  background:var(--bg-0);color:var(--t1);font-size:13px;line-height:1.5;
+  display:flex;
+}
+a{color:inherit;text-decoration:none}
+
+/* ═══════════════════════════════════════════════════════════
+   Scrollbar
+   ═══════════════════════════════════════════════════════════ */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hi)}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════════════════ */
+.sidebar{
+  width:280px;min-width:280px;
+  background:var(--bg-1);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+/* header */
+.sb-head{
+  padding:18px 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.sb-logo{font-size:15px;font-weight:700;color:var(--t0);letter-spacing:-.3px}
+.sb-logo em{font-style:normal;color:var(--accent)}
+.live-tag{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--green);text-transform:uppercase;letter-spacing:1.2px;font-weight:700}
+.live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pls 2s ease-in-out infinite}
+@keyframes pls{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(63,185,80,.4)}50%{opacity:.8;box-shadow:0 0 0 5px rgba(63,185,80,0)}}
+
+/* nav (Live Logs button) */
+.sb-nav{padding:4px 8px 0}
+.nav-btn{
+  width:100%;padding:8px 10px;border-radius:6px;
+  border:1px solid transparent;background:transparent;
+  color:var(--t1);font-family:inherit;font-size:12px;
+  cursor:pointer;text-align:left;
+  display:flex;align-items:center;gap:8px;
+  transition:background .15s;
+}
+.nav-btn:hover{background:var(--bg-3)}
+.nav-btn.active{background:rgba(88,166,255,.1);border-color:rgba(88,166,255,.28);color:var(--accent)}
+.nav-btn .nb-icon{font-size:14px}
+.nav-btn .nb-label{flex:1}
+.nav-btn .nb-badge{font-size:10px;background:var(--bg-3);padding:1px 7px;border-radius:9px;color:var(--t3)}
+
+/* section label */
+.sb-label{padding:14px 16px 4px;font-size:9px;text-transform:uppercase;letter-spacing:1.3px;color:var(--t3);font-weight:600}
+
+/* session list */
+.sb-sessions{flex:1;overflow-y:auto;padding:2px 8px 8px}
+.s-card{
+  padding:10px 11px;border-radius:6px;
+  border:1px solid transparent;cursor:pointer;
+  margin-bottom:2px;transition:background .15s;
+  position:relative;
+}
+.s-card:hover{background:var(--bg-3)}
+.s-card.active{background:rgba(88,166,255,.08);border-color:rgba(88,166,255,.25)}
+.s-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.s-card-id{font-size:11.5px;color:var(--t0);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.s-card-bot{display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--t3)}
+
+/* badge */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;flex-shrink:0}
+.badge-proc{background:rgba(90,166,254,.13);color:#5aa6fe}
+.badge-proc .bd{width:6px;height:6px;background:#5aa6fe;border-radius:50%;animation:blnk 1.4s ease-in-out infinite}
+@keyframes blnk{0%,100%{opacity:1}50%{opacity:.25}}
+.badge-idle{background:rgba(139,148,158,.1);color:var(--t3)}
+
+/* heartbeat animation for processing sessions */
+.s-card.processing{animation:heartbeat 2s ease-in-out infinite}
+@keyframes heartbeat{
+  0%,100%{background:transparent}
+  50%{background:rgba(63,185,80,.1)}
+}
+
+/* footer (connection) */
+.sb-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sb-foot-left{display:flex;align-items:center;gap:8px;flex:1}
+.sb-foot-right{display:flex;align-items:center;gap:4px}
+.cd{width:8px;height:8px;border-radius:50%;transition:background .3s}
+.cd.connected{background:var(--green)}
+.cd.disconnected{background:var(--red)}
+.cd.connecting{background:var(--orange);animation:blnk 1.2s infinite}
+.cd-label{font-size:11px;color:var(--t3)}
+
+/* theme toggle */
+.theme-btn{
+  width:26px;height:26px;border-radius:5px;
+  border:1px solid transparent;background:transparent;
+  color:var(--t3);font-size:14px;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.theme-btn:hover{border-color:var(--border);color:var(--t0);background:var(--bg-3)}
+
+/* empty placeholder */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:180px;color:var(--t3);gap:6px}
+.empty .ei{font-size:26px}
+.empty p{font-size:12px}
+
+/* scroll-to-top button */
+.scroll-top-btn{
+  position:absolute;bottom:24px;right:24px;
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--border-hi);
+  background:var(--bg-2);color:var(--t1);
+  font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+  opacity:0;visibility:hidden;
+  transition:opacity .2s,visibility .2s,background .15s,border-color .15s;
+  z-index:20;
+}
+.scroll-top-btn.show{opacity:1;visibility:visible}
+.scroll-top-btn:hover{background:var(--bg-3);border-color:var(--accent);color:var(--accent)}
+
+/* toast notification */
+.toast-container{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{
+  padding:10px 16px;border-radius:6px;
+  background:var(--bg-2);border:1px solid var(--border);
+  color:var(--t1);font-size:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  animation:toast-in .2s ease;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.error{border-color:var(--red);color:var(--red)}
+.toast.success{border-color:var(--green);color:var(--green)}
+@keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(20px)}}
+
+/* language selector */
+.lang-btn{
+  width:26px;height:26px;border-radius:5px;
+  border:1px solid transparent;background:transparent;
+  color:var(--t3);font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.lang-btn:hover{border-color:var(--border);color:var(--t0);background:var(--bg-3)}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN
+   ═══════════════════════════════════════════════════════════ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+/* toolbar row */
+.main-hdr{
+  padding:10px 18px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-1);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-shrink:0;
+}
+.mh-left{display:flex;flex-direction:column;gap:1px}
+.mh-title{font-size:13px;font-weight:600;color:var(--t0)}
+.mh-sub{font-size:10px;color:var(--t3)}
+.mh-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+
+/* search box */
+.search-box{
+  display:flex;align-items:center;gap:6px;
+}
+.search-input{
+  width:180px;padding:4px 10px;border-radius:6px;
+  border:1px solid var(--border);background:var(--bg-2);
+  color:var(--t1);font-size:11px;font-family:inherit;
+  outline:none;transition:all .15s;
+}
+.search-input::placeholder{color:var(--t3)}
+.search-input:focus{border-color:var(--accent);background:var(--bg-1)}
+.search-clear{
+  width:20px;height:20px;border-radius:4px;
+  border:none;background:transparent;
+  color:var(--t3);font-size:12px;
+  cursor:pointer;display:none;
+  align-items:center;justify-content:center;
+}
+.search-clear.show{display:flex}
+.search-clear:hover{background:var(--bg-3);color:var(--t1)}
+
+/* filter pills */
+.filters{display:flex;gap:4px}
+.fpill{
+  padding:3px 9px;border-radius:11px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--t3);font-size:10px;font-family:inherit;
+  cursor:pointer;transition:all .15s;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.fpill:hover{border-color:var(--border-hi);color:var(--t1)}
+.fpill.active{background:rgba(88,166,255,.12);border-color:rgba(88,166,255,.3);color:var(--accent)}
+
+/* auto-scroll toggle */
+.toggle-wrap{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)}
+.tog{width:32px;height:18px;background:var(--bg-3);border-radius:9px;cursor:pointer;position:relative;border:1px solid var(--border);transition:background .2s}
+.tog.on{background:var(--green);border-color:var(--green)}
+.tog .knob{width:14px;height:14px;background:#fff;border-radius:50%;position:absolute;top:1px;left:1px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tog.on .knob{left:16px}
+
+/* clear btn */
+.btn-clr{padding:3px 9px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--t3);font-size:10px;font-family:inherit;cursor:pointer;transition:all .15s}
+.btn-clr:hover{border-color:var(--red);color:var(--red)}
+
+/* event counter */
+.evt-cnt{font-size:10px;color:var(--t3);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ═══════════════════════════════════════════════════════════
+   SESSION SUMMARY BAR (shown when viewing a session)
+   ═══════════════════════════════════════════════════════════ */
+.sess-summary{
+  display:flex;flex-direction:column;gap:0;
+  padding:0;background:var(--bg-2);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.ss-row-top{
+  display:flex;gap:20px;flex-wrap:wrap;align-items:center;
+  padding:10px 18px 6px;
+}
+.ss-item{display:flex;flex-direction:column;gap:1px}
+.ss-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--t3);font-weight:600}
+.ss-val{font-size:11px;color:var(--t0);font-weight:600;font-variant-numeric:tabular-nums}
+.ss-del{
+  margin-left:auto;
+  padding:4px 12px;border-radius:5px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--t3);font-size:11px;font-family:inherit;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:5px;
+}
+.ss-del:hover{border-color:var(--red);color:var(--red);background:rgba(255,123,114,.08)}
+.ss-models{
+  display:flex;gap:8px;flex-wrap:wrap;
+  padding:0 18px 10px;
+}
+.ss-model-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px;border-radius:5px;
+  background:var(--bg-3);border:1px solid var(--border);
+  font-size:10.5px;color:var(--t1);
+}
+.ss-model-tag.current{border-color:rgba(88,166,255,.4);background:rgba(88,166,255,.08)}
+.ss-model-name{font-weight:600;color:var(--t0)}
+.ss-model-detail{color:var(--t3);font-variant-numeric:tabular-nums}
+
+/* ═══════════════════════════════════════════════════════════
+   STREAM AREA
+   ═══════════════════════════════════════════════════════════ */
+.stream{flex:1;overflow-y:auto}
+
+/* ── Log table header ── */
+.log-header{
+  display:grid;grid-template-columns:80px 78px 1fr 50px;
+  gap:10px;align-items:center;
+  padding:6px 16px;
+  background:var(--bg-2);
+  border-bottom:1px solid var(--border);
+  font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.8px;
+  color:var(--t3);
+  position:sticky;top:0;z-index:10;
+}
+
+/* ── Live log row ── */
+.log-row{
+  display:grid;grid-template-columns:80px 78px 1fr 50px;
+  gap:10px;align-items:baseline;
+  padding:3px 16px;
+  border-bottom:1px solid var(--border);
+  font-size:11px;
+  transition:background .1s;
+}
+.log-row:hover{background:var(--bg-2)}
+
+/* copy button */
+.lr-actions{display:flex;justify-content:center}
+.copy-btn{
+  width:24px;height:24px;border-radius:4px;
+  border:1px solid transparent;background:transparent;
+  color:var(--t3);font-size:12px;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;
+}
+.log-row:hover .copy-btn{opacity:1}
+.copy-btn:hover{border-color:var(--border);background:var(--bg-3);color:var(--t1)}
+.copy-btn.copied{color:var(--green);border-color:var(--green)}
+.lr-time{color:var(--t3);font-variant-numeric:tabular-nums;flex-shrink:0}
+.lr-badge{
+  display:inline-block;text-align:center;
+  padding:1px 5px;border-radius:3px;
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+}
+/* badge colours */
+.bt-enqueue{background:rgba(88,166,255,.15);color:#58a6ff}
+.bt-dequeue{background:rgba(88,166,255,.1) ;color:#4a9beb}
+.bt-run_start{background:rgba(63,185,80,.15);color:#3fb950}
+.bt-run_done {background:rgba(86,211,100,.12);color:#56d364}
+.bt-tool_start{background:rgba(255,166,87,.15);color:#ffa657}
+.bt-tool_end  {background:rgba(210,147,67,.12);color:#d29343}
+.bt-session_state{background:rgba(188,140,255,.15);color:#bc8cff}
+.bt-error{background:rgba(255,123,114,.15);color:#ff7b72}
+.bt-warn {background:rgba(227,179, 65,.12);color:#e3b341}
+.bt-other{background:rgba(139,148,158,.1) ;color:var(--t3)}
+
+.lr-msg{color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.log-row.expanded{background:var(--bg-2)}
+.log-row.expanded .lr-msg{white-space:pre-wrap;word-break:break-word;overflow:visible;text-overflow:clip}
+/* clickable session-id links inside log messages */
+.s-link{color:var(--accent);cursor:pointer}
+.s-link:hover{text-decoration:underline}
+
+/* ── Session detail blocks ── */
+.s-msg{padding:10px 16px;border-bottom:1px solid var(--border)}
+.s-msg:last-child{border-bottom:none}
+.s-msg.live .role-hdr::after{content:'NEW';font-size:9px;background:rgba(63,185,80,.15);color:var(--green);padding:1px 5px;border-radius:3px;margin-left:8px}
+
+.role-hdr{display:flex;align-items:center;gap:5px;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px}
+.rh-user{color:var(--accent)}
+.rh-asst{color:var(--orange)}
+.rh-tool{color:var(--green)}
+.rh-meta{color:var(--t3)}
+
+/* thinking (always expanded) */
+.blk-think{
+  background:var(--bg-2);border-left:3px solid var(--purple);
+  border-radius:0 6px 6px 0;margin:4px 0;
+}
+.think-hdr{
+  padding:6px 10px;
+  display:flex;align-items:center;gap:6px;color:var(--purple);font-size:11px;
+}
+.think-body{overflow-y:auto}
+.think-body pre{padding:0 10px 8px;color:var(--t2);font-size:11px;white-space:pre-wrap;word-break:break-word}
+
+/* tool call */
+.blk-tcall{
+  background:var(--bg-2);border-left:3px solid var(--orange);
+  border-radius:0 6px 6px 0;padding:8px 10px;margin:4px 0;
+}
+.tcall-name{color:var(--orange);font-weight:700;font-size:12px;display:flex;align-items:center;gap:6px}
+.tcall-name .tid{color:var(--t3);font-size:10px;font-weight:400}
+.tcall-args{margin-top:4px;color:var(--t2);font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:180px;overflow-y:auto}
+/* json syntax in args */
+.jk{color:var(--accent)}
+.js{color:var(--green2)}
+.jn{color:var(--purple)}
+.jw{color:var(--orange)}
+
+/* tool result */
+.blk-tres{
+  background:var(--bg-2);border-left:3px solid var(--green);
+  border-radius:0 6px 6px 0;padding:8px 10px;margin:4px 0;
+  max-height:240px;overflow-y:auto;
+}
+.blk-tres pre{color:var(--t2);font-size:11px;white-space:pre-wrap;word-break:break-word}
+
+/* assistant response block */
+.blk-text{
+  background:var(--bg-2);border-left:3px solid var(--accent);
+  border-radius:0 6px 6px 0;margin:4px 0;
+}
+.text-hdr{
+  padding:6px 10px;
+  display:flex;align-items:center;gap:6px;color:var(--accent);font-size:11px;font-weight:600;
+}
+.text-body{padding:0 12px 10px;color:var(--t1);font-size:13px;word-break:break-word;line-height:1.6}
+.text-body h1,.text-body h2,.text-body h3,.text-body h4,.text-body h5,.text-body h6{color:var(--t0);margin:12px 0 6px;font-weight:600}
+.text-body h1{font-size:20px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.text-body h2{font-size:17px;border-bottom:1px solid var(--border);padding-bottom:3px}
+.text-body h3{font-size:15px}
+.text-body p{margin:6px 0}
+.text-body ul,.text-body ol{margin:6px 0;padding-left:20px}
+.text-body li{margin:2px 0}
+.text-body code{background:var(--bg-3);color:var(--orange);padding:1px 5px;border-radius:3px;font-size:12px}
+.text-body pre{background:var(--bg-3);border-radius:6px;padding:10px 12px;margin:8px 0;overflow-x:auto}
+.text-body pre code{background:none;color:var(--t1);padding:0;font-size:12px}
+.text-body blockquote{border-left:3px solid var(--purple);padding:4px 12px;margin:6px 0;color:var(--t2)}
+.text-body table{border-collapse:collapse;margin:8px 0;width:100%}
+.text-body th,.text-body td{border:1px solid var(--border);padding:6px 10px;font-size:12px;text-align:left}
+.text-body th{background:var(--bg-3);font-weight:600;color:var(--t0)}
+.text-body a{color:var(--accent);text-decoration:none}
+.text-body a:hover{text-decoration:underline}
+.text-body hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.text-body img{max-width:100%;border-radius:4px}
+/* user question block */
+.blk-user{
+  background:var(--bg-2);border-left:3px solid var(--green);
+  border-radius:0 6px 6px 0;margin:4px 0;
+}
+.user-hdr{
+  padding:6px 10px;
+  display:flex;align-items:center;gap:6px;color:var(--green);font-size:11px;font-weight:600;
+}
+.user-body{padding:0 12px 10px;color:var(--t1);font-size:13px;white-space:pre-wrap;word-break:break-word;line-height:1.6}
+
+/* meta / raw */
+.blk-meta{
+  background:var(--bg-2);border-left:3px solid var(--t3);
+  border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0;
+  font-size:10px;color:var(--t3);white-space:pre-wrap;word-break:break-word;
+}
+</style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══ SIDEBAR ═══════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sb-head">
+    <div class="sb-logo"><em>openclaw</em> monitor</div>
+    <div class="live-tag"><span class="live-dot"></span>live</div>
+  </div>
+
+  <div class="sb-nav">
+    <button class="nav-btn active" id="btn-live">
+      <span class="nb-icon">⚡</span>
+      <span class="nb-label">Live Logs</span>
+      <span class="nb-badge" id="evt-cnt">0</span>
+    </button>
+  </div>
+
+  <div class="sb-label">Sessions <span id="sess-active" style="color:var(--green);margin-left:6px"></span></div>
+  <div class="sb-sessions" id="sb-sessions">
+    <div class="empty"><p>No sessions</p></div>
+  </div>
+
+  <div class="sb-foot">
+    <div class="sb-foot-left">
+      <span class="cd connecting" id="conn-dot"></span>
+      <span class="cd-label" id="conn-label">Connecting…</span>
+    </div>
+    <div class="sb-foot-right">
+      <button class="lang-btn" id="lang-btn" title="切换语言/Language">中</button>
+      <button class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══════════════════════════════════════════════ -->
+<main class="main">
+  <div class="main-hdr">
+    <div class="mh-left">
+      <span class="mh-title" id="mh-title">Live Logs</span>
+      <span class="mh-sub"  id="mh-sub">openclaw logs --follow</span>
+    </div>
+    <div class="mh-right">
+      <div class="search-box" id="search-box">
+        <input type="text" class="search-input" id="search-input" placeholder="Search logs...">
+        <button class="search-clear" id="search-clear">✕</button>
+      </div>
+      <div class="filters" id="filters">
+        <button class="fpill active" data-f="all">All</button>
+        <button class="fpill" data-f="queue">Queue</button>
+        <button class="fpill" data-f="run">Run</button>
+        <button class="fpill" data-f="tool">Tool</button>
+        <button class="fpill" data-f="session">Session</button>
+        <button class="fpill" data-f="error">Error</button>
+      </div>
+      <div class="toggle-wrap">
+        <span>Scroll</span>
+        <div class="tog on" id="tog-scroll"><div class="knob"></div></div>
+      </div>
+      <button class="btn-clr" id="btn-clr">Clear</button>
+    </div>
+  </div>
+
+  <!-- session summary bar (hidden until a session is selected) -->
+  <div class="sess-summary" id="sess-summary" style="display:none">
+    <div class="ss-row-top">
+      <div class="ss-item"><span class="ss-label">Session</span><span class="ss-val" id="ss-id">—</span></div>
+      <div class="ss-item"><span class="ss-label">Provider</span><span class="ss-val" id="ss-provider">—</span></div>
+      <div class="ss-item"><span class="ss-label">Messages</span><span class="ss-val" id="ss-msgs">—</span></div>
+      <div class="ss-item"><span class="ss-label">Status</span><span class="ss-val" id="ss-status">—</span></div>
+      <div class="ss-item"><span class="ss-label">Tokens</span><span class="ss-val" id="ss-tokens">—</span></div>
+      <div class="ss-item"><span class="ss-label">Cost</span><span class="ss-val" id="ss-cost">—</span></div>
+    </div>
+    <div class="ss-models" id="ss-models"></div>
+  </div>
+
+  <div class="stream" id="stream">
+    <div class="empty"><div class="ei">📡</div><p id="stream-wait-text">Waiting for events…</p></div>
+  </div>
+  <button class="scroll-top-btn" id="scroll-top-btn" title="Scroll to top">↑</button>
+</main>
+
+<!-- ═══ SCRIPT ═════════════════════════════════════════════ -->
+<script>
+/* ── state ──────────────────────────────────────────────── */
+const S = {
+  view:        'live',   // 'live' | sessionId
+  filter:      'all',
+  autoScroll:  true,
+  sessions:    [],
+  liveLogs:    [],       // buffer for re-filter
+  es:          null,     // current EventSource
+  historyDone: false,
+  searchQuery: '',       // search query
+  theme:       'dark',   // 'dark' | 'light'
+  lang:        'zh',     // 'en' | 'zh'
+};
+
+/* ── i18n (国际化) ────────────────────────────────────────── */
+const I18N = {
+  en: {
+    liveLogs: 'Live Logs',
+    sessions: 'Sessions',
+    active: 'active',
+    noSessions: 'No sessions found',
+    deleteSession: 'Delete session',
+    msgs: 'msgs',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    connecting: 'Connecting…',
+    time: 'Time',
+    type: 'Type',
+    content: 'Content',
+    actions: 'Actions',
+    all: 'All',
+    queue: 'Queue',
+    run: 'Run',
+    tool: 'Tool',
+    session: 'Session',
+    error: 'Error',
+    scroll: 'Scroll',
+    clear: 'Clear',
+    searchLogs: 'Search logs...',
+    waiting: 'Waiting for events…',
+    copySuccess: 'Copied!',
+    copyFailed: 'Copy failed',
+    provider: 'Provider',
+    model: 'Model',
+    messages: 'Messages',
+    status: 'Status',
+    user: 'User',
+    assistant: 'Assistant',
+    toolResult: 'Tool Result',
+    meta: 'Meta',
+    thinking: 'Thinking',
+    response: 'Response',
+    deleteConfirm: 'Delete session',
+    tokens: 'Tokens',
+    cost: 'Cost',
+    inputTokens: 'In',
+    outputTokens: 'Out',
+    cacheTokens: 'Cache',
+    idle: 'idle',
+    processing: 'processing',
+    idleFor: 'idle {0}',
+    justNow: 'just now',
+    minutesAgo: '{0}m ago',
+    hoursAgo: '{0}h ago',
+    daysAgo: '{0}d ago',
+  },
+  zh: {
+    liveLogs: '实时日志',
+    sessions: '会话列表',
+    active: '运行中',
+    noSessions: '暂无会话',
+    deleteSession: '删除会话',
+    msgs: '条消息',
+    connected: '已连接',
+    disconnected: '已断开',
+    connecting: '连接中…',
+    time: '时间',
+    type: '类型',
+    content: '内容',
+    actions: '操作',
+    all: '全部',
+    queue: '队列',
+    run: '运行',
+    tool: '工具',
+    session: '会话',
+    error: '错误',
+    scroll: '自动滚动',
+    clear: '清空',
+    searchLogs: '搜索日志...',
+    waiting: '等待事件中…',
+    copySuccess: '已复制!',
+    copyFailed: '复制失败',
+    provider: '提供商',
+    model: '模型',
+    messages: '消息数',
+    status: '状态',
+    user: '用户',
+    assistant: '助手',
+    toolResult: '工具结果',
+    meta: '元数据',
+    thinking: '思考中',
+    response: '回答',
+    deleteConfirm: '删除会话',
+    tokens: 'Tokens',
+    cost: '费用',
+    inputTokens: '输入',
+    outputTokens: '输出',
+    cacheTokens: '缓存',
+    idle: '空闲',
+    processing: '运行中',
+    idleFor: '空闲 {0}',
+    justNow: '刚刚',
+    minutesAgo: '{0}分钟前',
+    hoursAgo: '{0}小时前',
+    daysAgo: '{0}天前',
+  }
+};
+
+function i18n(key) {
+  return I18N[S.lang]?.[key] || I18N.en[key] || key;
+}
+
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toast-out .2s ease forwards';
+    setTimeout(() => toast.remove(), 200);
+  }, 2000);
+}
+
+/* ── init ───────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  initLang();
+  initAutoScroll();
+  bindAll();
+  loadSessions();
+  switchView('live');
+  setInterval(loadSessions, 5000);   // refresh session list
+});
+
+/* ── theme management ───────────────────────────────────── */
+function initTheme() {
+  const saved = localStorage.getItem('theme') || 'dark';
+  S.theme = saved;
+  applyTheme(saved);
+}
+
+function toggleTheme() {
+  S.theme = S.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', S.theme);
+  applyTheme(S.theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('theme-btn');
+  btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  btn.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+}
+
+/* ── auto-scroll persistence ───────────────────────────── */
+function initAutoScroll() {
+  const saved = localStorage.getItem('autoScroll');
+  if (saved !== null) {
+    S.autoScroll = saved === 'true';
+  }
+  document.getElementById('tog-scroll').classList.toggle('on', S.autoScroll);
+}
+
+/* ── language management ───────────────────────────────── */
+function initLang() {
+  const saved = localStorage.getItem('lang') || 'zh';
+  S.lang = saved;
+  applyLang(saved);
+}
+
+function toggleLang() {
+  S.lang = S.lang === 'en' ? 'zh' : 'en';
+  localStorage.setItem('lang', S.lang);
+  applyLang(S.lang);
+}
+
+function applyLang(lang) {
+  const btn = document.getElementById('lang-btn');
+  btn.textContent = lang === 'en' ? '中' : 'EN';
+  btn.title = lang === 'en' ? '切换到中文' : 'Switch to English';
+  updateAllText();
+}
+
+function updateAllText() {
+  // Sidebar
+  document.querySelector('.sb-label').innerHTML = `${i18n('sessions')} <span id="sess-active" style="color:var(--green);margin-left:6px"></span>`;
+  document.querySelector('#btn-live .nb-label').textContent = i18n('liveLogs');
+
+  // Main header (if on live view)
+  if (S.view === 'live') {
+    document.getElementById('mh-title').textContent = i18n('liveLogs');
+  }
+
+  // Search
+  document.getElementById('search-input').placeholder = i18n('searchLogs');
+
+  // Filter pills
+  const filters = document.querySelectorAll('.fpill');
+  const filterKeys = ['all', 'queue', 'run', 'tool', 'session', 'error'];
+  filters.forEach((btn, i) => {
+    if (filterKeys[i]) btn.textContent = i18n(filterKeys[i]);
+  });
+
+  // Toggle and clear
+  document.querySelector('.toggle-wrap span').textContent = i18n('scroll');
+  document.getElementById('btn-clr').textContent = i18n('clear');
+
+  // Session summary labels
+  const ssLabels = document.querySelectorAll('.ss-label');
+  const labelKeys = ['session', 'provider', 'model', 'messages', 'status', 'tokens', 'cost'];
+  ssLabels.forEach((el, i) => {
+    if (labelKeys[i]) el.textContent = i18n(labelKeys[i]);
+  });
+
+  // Connection status
+  const dot = document.getElementById('conn-dot');
+  if (dot.classList.contains('connected')) {
+    document.getElementById('conn-label').textContent = i18n('connected');
+  } else if (dot.classList.contains('disconnected')) {
+    document.getElementById('conn-label').textContent = i18n('disconnected');
+  } else {
+    document.getElementById('conn-label').textContent = i18n('connecting');
+  }
+
+  // Update stream waiting text if present
+  const waitText = document.getElementById('stream-wait-text');
+  if (waitText) waitText.textContent = i18n('waiting');
+
+  // Re-render sessions to update text
+  renderSessions();
+
+  // Update log header if present
+  const logHeader = document.querySelector('.log-header');
+  if (logHeader) {
+    logHeader.innerHTML = `<span>${i18n('time')}</span><span>${i18n('type')}</span><span>${i18n('content')}</span><span>${i18n('actions')}</span>`;
+  }
+}
+
+/* ── load sessions via REST ─────────────────────────────── */
+async function loadSessions() {
+  try {
+    S.sessions = await (await fetch('/api/sessions')).json();
+    renderSessions();
+  } catch(e) { console.error('sessions load:', e); }
+}
+
+/* ── delete session ─────────────────────────────────────── */
+async function deleteSession(sid) {
+  if (!confirm(`${i18n('deleteConfirm')} ${sid.substring(0,8)}…?`)) return;
+  try {
+    const res = await fetch(`/api/session/${sid}`, { method: 'DELETE' });
+    if (res.ok) {
+      // if viewing the deleted session, switch to live
+      if (S.view === sid) switchView('live');
+      loadSessions();
+    } else {
+      const err = await res.text();
+      alert('Delete failed: ' + err);
+    }
+  } catch(e) {
+    console.error('delete session:', e);
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+/* ── render session cards ───────────────────────────────── */
+function renderSessions() {
+  const el = document.getElementById('sb-sessions');
+  if (!S.sessions.length) {
+    el.innerHTML = `<div class="empty" style="min-height:100px"><p>${i18n('noSessions')}</p></div>`;
+    document.getElementById('sess-active').textContent = '';
+    return;
+  }
+  // Sort sessions: processing first, then by mtime
+  S.sessions.sort((a, b) => {
+    if (a.status === 'processing' && b.status !== 'processing') return -1;
+    if (a.status !== 'processing' && b.status === 'processing') return 1;
+    return (b.mtime || 0) - (a.mtime || 0);
+  });
+  const active = S.sessions.filter(s => s.status === 'processing').length;
+  document.getElementById('sess-active').textContent = active ? `${active} ${i18n('active')}` : '';
+
+  el.innerHTML = S.sessions.map(s => {
+    const short = s.id.substring(0,8) + '-' + s.id.substring(9,13) + '…';
+    const isAct = S.view === s.id;
+    const proc  = s.status === 'processing';
+    const statusText = proc ? i18n('processing') : fmtIdleTime(s.idle_since);
+    return `<div class="s-card${isAct?' active':''}${proc?' processing':''}" data-session="${s.id}" onclick="switchView('${s.id}')">
+      <div class="s-card-top">
+        <span class="s-card-id">${short}</span>
+        <span class="badge ${proc?'badge-proc':'badge-idle'}">
+          ${proc?'<span class="bd"></span>':''}${statusText}
+        </span>
+      </div>
+      <div class="s-card-bot">
+        <span>${s.provider||'—'} / ${s.model||'—'}</span>
+        <span>${s.message_count||0} ${i18n('msgs')}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── view switch ────────────────────────────────────────── */
+function switchView(id) {
+  closeES();
+  S.view = id;
+  S.historyDone = false;
+  clearStream();
+
+  // update sidebar active
+  document.querySelectorAll('.nav-btn,.s-card').forEach(e => e.classList.remove('active'));
+
+  if (id === 'live') {
+    document.getElementById('btn-live').classList.add('active');
+    document.getElementById('mh-title').textContent = i18n('liveLogs');
+    document.getElementById('mh-sub').textContent   = 'openclaw logs --follow';
+    document.getElementById('filters').style.display = 'flex';
+    document.getElementById('search-box').style.display = 'flex';
+    document.getElementById('sess-summary').style.display = 'none';
+    const delBtn = document.getElementById('ss-del');
+    if (delBtn) delBtn.remove();
+    S.liveLogs = [];
+    startLive();
+  } else {
+    const card = document.querySelector(`[data-session="${id}"]`);
+    if (card) card.classList.add('active');
+    const sess = S.sessions.find(s => s.id === id);
+
+    document.getElementById('mh-title').textContent = id.substring(0,20) + '…';
+    // subtitle: show all model names used in session
+    const modelNames = sess?.models ? Object.keys(sess.models) : [];
+    document.getElementById('mh-sub').textContent = sess
+      ? (modelNames.length > 0 ? modelNames.join(' / ') : (sess.model || '—'))
+      : '';
+    document.getElementById('filters').style.display = 'none';
+    document.getElementById('search-box').style.display = 'none';
+
+    // show summary bar
+    document.getElementById('sess-summary').style.display = '';
+    document.getElementById('ss-id').textContent       = id;
+    document.getElementById('ss-provider').textContent = sess?.provider || '—';
+    document.getElementById('ss-msgs').textContent     = sess?.message_count || '—';
+    const status = sess?.status || 'idle';
+    document.getElementById('ss-status').textContent   = status === 'processing' ? i18n('processing') : i18n('idle');
+
+    // total token usage
+    const usage = sess?.usage;
+    if (usage && usage.totalTokens > 0) {
+      document.getElementById('ss-tokens').textContent = fmtTokens(usage.totalTokens);
+      document.getElementById('ss-tokens').title =
+        `${i18n('inputTokens')}: ${fmtTokens(usage.input)} | ${i18n('outputTokens')}: ${fmtTokens(usage.output)} | ${i18n('cacheTokens')}: ${fmtTokens(usage.cacheRead)}`;
+      if (usage.cost > 0) {
+        document.getElementById('ss-cost').textContent = '$' + usage.cost.toFixed(4);
+      } else {
+        document.getElementById('ss-cost').textContent = '—';
+      }
+    } else {
+      document.getElementById('ss-tokens').textContent = '—';
+      document.getElementById('ss-cost').textContent = '—';
+    }
+
+    // render per-model tags
+    const modelsEl = document.getElementById('ss-models');
+    const models = sess?.models || {};
+    const modelKeys = Object.keys(models);
+    if (modelKeys.length > 0) {
+      modelsEl.innerHTML = modelKeys.map(m => {
+        const u = models[m];
+        const isCurrent = m === sess.model;
+        const costStr = u.cost > 0 ? ` · $${u.cost.toFixed(4)}` : '';
+        const detail = `${fmtTokens(u.totalTokens)}${costStr}`;
+        const tooltip = `${i18n('inputTokens')}: ${fmtTokens(u.input)} | ${i18n('outputTokens')}: ${fmtTokens(u.output)} | ${i18n('cacheTokens')}: ${fmtTokens(u.cacheRead)}`;
+        return `<span class="ss-model-tag${isCurrent?' current':''}" title="${tooltip}">` +
+          `<span class="ss-model-name">${m}</span>` +
+          `<span class="ss-model-detail">${detail}</span>` +
+          `</span>`;
+      }).join('');
+    } else {
+      modelsEl.innerHTML = `<span class="ss-model-tag current"><span class="ss-model-name">${sess?.model||'—'}</span></span>`;
+    }
+
+    // show delete button in top row
+    let delBtn = document.getElementById('ss-del');
+    if (!delBtn) {
+      delBtn = document.createElement('button');
+      delBtn.id = 'ss-del';
+      delBtn.className = 'ss-del';
+      document.querySelector('.ss-row-top').appendChild(delBtn);
+    }
+    delBtn.innerHTML = `✕ ${i18n('deleteSession')}`;
+    delBtn.onclick = () => deleteSession(id);
+
+    startSession(id);
+  }
+}
+
+/* ── SSE: live logs ─────────────────────────────────────── */
+function startLive() {
+  setConn('connecting');
+  S.es = new EventSource('/api/logs/stream');
+
+  S.es.addEventListener('log', e => {
+    const d = JSON.parse(e.data);
+    S.liveLogs.push(d);
+    if (filterMatch(d.type, S.filter) && searchMatch(d.raw || '', S.searchQuery)) {
+      appendLogRow(d);
+    }
+    document.getElementById('evt-cnt').textContent = S.liveLogs.length;
+  });
+
+  S.es.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    appendLogRow({ type: d.type || 'warn', raw: d.message || '' });
+  });
+
+  S.es.onopen  = () => setConn('connected');
+  S.es.onerror = () => {
+    setConn('disconnected');
+    setTimeout(() => { if (S.view==='live') startLive(); }, 3000);
+  };
+}
+
+/* ── SSE: session detail ────────────────────────────────── */
+function startSession(sid) {
+  setConn('connecting');
+  S.es = new EventSource(`/api/session/${sid}/stream`);
+
+  S.es.addEventListener('session_event', e => {
+    appendSessionBlock(JSON.parse(e.data), S.historyDone);
+  });
+
+  S.es.addEventListener('history_done', () => {
+    S.historyDone = true;
+    setConn('connected');
+  });
+
+  S.es.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'error') {
+      setConn('disconnected');
+      document.getElementById('stream').innerHTML =
+        `<div class="empty"><div class="ei">⚠️</div><p>${esc(d.message)}</p></div>`;
+    }
+  });
+
+  S.es.onopen  = () => setConn('connecting');
+  S.es.onerror = () => setConn('disconnected');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER: live log row
+   ═══════════════════════════════════════════════════════════ */
+function ensureLogHeader() {
+  const stream = document.getElementById('stream');
+  let header = stream.querySelector('.log-header');
+  if (!header) {
+    header = document.createElement('div');
+    header.className = 'log-header';
+    stream.insertBefore(header, stream.firstChild);
+  }
+  header.innerHTML = `<span>${i18n('time')}</span><span>${i18n('type')}</span><span>${i18n('content')}</span><span>${i18n('actions')}</span>`;
+}
+
+function appendLogRow(data) {
+  const stream = document.getElementById('stream');
+  rmEmpty(stream);
+  ensureLogHeader();
+
+  const t    = data.type || 'other';
+  // Try to extract timestamp from data: timestamp, ts, time, @timestamp, or _meta.date
+  const ts   = data.timestamp || data.ts || data.time || data['@timestamp'] || (data._meta && data._meta.date) || null;
+  const time = fmtTime(ts);
+  const rawText = data.raw || '';
+  const row  = document.createElement('div');
+  row.className = 'log-row';
+  row.dataset.raw = rawText; // store raw text for search
+  row.innerHTML =
+    `<span class="lr-time">${time}</span>` +
+    `<span class="lr-badge bt-${t}">${badgeLabel(t)}</span>` +
+    `<span class="lr-msg">${linkSids(esc(rawText))}</span>` +
+    `<div class="lr-actions"><button class="copy-btn" title="Copy log">📋</button></div>`;
+
+  // Click to expand/collapse log row (but not on copy button)
+  row.addEventListener('click', function(e) {
+    // Don't toggle if clicking a link or copy button
+    if (e.target.classList.contains('s-link') || e.target.classList.contains('copy-btn')) return;
+    this.classList.toggle('expanded');
+  });
+
+  // Copy button handler
+  const copyBtn = row.querySelector('.copy-btn');
+  copyBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const text = rawText;  // Only copy log content (JSON), not timestamp
+    const btn = this;
+
+    // Try modern clipboard API first, fallback to execCommand
+    const copySuccess = () => {
+      btn.classList.add('copied');
+      btn.textContent = '✓';
+      showToast(i18n('copySuccess'));
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = '📋';
+      }, 1500);
+    };
+
+    const copyFail = () => {
+      showToast(i18n('copyFailed'), 'error');
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(copySuccess).catch(copyFail);
+    } else {
+      // Fallback for non-HTTPS
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        copySuccess();
+      } catch (err) {
+        copyFail();
+      }
+      document.body.removeChild(textarea);
+    }
+  });
+
+  stream.appendChild(row);
+
+  // keep DOM bounded
+  const rows = stream.querySelectorAll('.log-row');
+  if (rows.length > 600) {
+    for (let i = 0; i < 100; i++) rows[i].remove();
+    S.liveLogs = S.liveLogs.slice(-500);
+  }
+
+  if (S.autoScroll) stream.scrollTop = stream.scrollHeight;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER: session message block
+   ═══════════════════════════════════════════════════════════ */
+function appendSessionBlock(data, isLive) {
+  const stream = document.getElementById('stream');
+  rmEmpty(stream);
+
+  const role   = data.role || 'unknown';
+  const blocks = data.blocks || [];
+  const div    = document.createElement('div');
+  div.className = 'session-msg' + (isLive ? ' live' : '');
+
+  let h = '';
+
+  if (role === 'user') {
+    h += `<div class="role-hdr rh-user">👤 ${i18n('user')}</div>`;
+    blocks.forEach(b => {
+      if (b.type === 'text') h += `<div class="blk-user">
+          <div class="user-hdr">💬 ${i18n('user')}</div>
+          <div class="user-body">${esc(b.content)}</div>
+        </div>`;
+    });
+
+  } else if (role === 'assistant') {
+    h += `<div class="role-hdr rh-asst">🤖 ${i18n('assistant')}</div>`;
+    blocks.forEach(b => {
+      if (b.type === 'thinking') {
+        h += `<div class="blk-think">
+          <div class="think-hdr">💭 ${i18n('thinking')} <span style="color:var(--t3);font-size:10px">(${b.content.length} chars)</span></div>
+          <div class="think-body"><pre>${esc(b.content)}</pre></div>
+        </div>`;
+      } else if (b.type === 'tool_call') {
+        h += `<div class="blk-tcall">
+          <div class="tcall-name">⚙️ ${esc(b.name)} <span class="tid">${esc(b.toolCallId||'')}</span></div>
+          <div class="tcall-args">${hlJson(esc(JSON.stringify(b.arguments, null, 2)))}</div>
+        </div>`;
+      } else if (b.type === 'text') {
+        h += `<div class="blk-text">
+          <div class="text-hdr">💬 ${i18n('response')}</div>
+          <div class="text-body">${renderMd(b.content)}</div>
+        </div>`;
+      }
+    });
+
+  } else if (role === 'toolResult') {
+    h += `<div class="role-hdr rh-tool">📋 ${i18n('toolResult')}</div>`;
+    blocks.forEach(b => {
+      if (b.type === 'tool_result') {
+        const txt = typeof b.content === 'string' ? b.content : JSON.stringify(b.content, null, 2);
+        h += `<div class="blk-tres"><pre>${esc(txt)}</pre></div>`;
+      }
+    });
+
+  } else if (role === 'meta') {
+    h += `<div class="role-hdr rh-meta">⚙ ${i18n('meta')}</div>`;
+    h += `<div class="blk-meta">${esc(JSON.stringify(data.meta || {}, null, 2))}</div>`;
+
+  } else {
+    h += `<div class="blk-meta">${esc(JSON.stringify(data))}</div>`;
+  }
+
+  div.innerHTML = h;
+  stream.appendChild(div);
+  if (S.autoScroll) stream.scrollTop = stream.scrollHeight;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+function closeES() { if (S.es) { S.es.close(); S.es = null; } }
+
+function clearStream() {
+  document.getElementById('stream').innerHTML =
+    `<div class="empty"><div class="ei">⏳</div><p>${i18n('connecting')}</p></div>`;
+}
+
+function setConn(st) {
+  document.getElementById('conn-dot').className  = 'cd ' + st;
+  document.getElementById('conn-label').textContent =
+    st === 'connected' ? i18n('connected') : st === 'disconnected' ? i18n('disconnected') : i18n('connecting');
+}
+
+function rmEmpty(el) { const e = el.querySelector('.empty'); if (e) e.remove(); }
+
+function filterMatch(type, f) {
+  if (f === 'all') return true;
+  const map = { queue:['enqueue','dequeue'], run:['run_start','run_done'],
+                tool:['tool_start','tool_end'], session:['session_state'], error:['error','warn'] };
+  return map[f] && map[f].includes(type);
+}
+
+function reRenderLive() {
+  const stream = document.getElementById('stream');
+  stream.innerHTML = '';
+  S.liveLogs.forEach(d => {
+    if (filterMatch(d.type, S.filter) && searchMatch(d.raw || '', S.searchQuery)) {
+      appendLogRow(d);
+    }
+  });
+}
+
+function searchMatch(text, query) {
+  if (!query) return true;
+  return text.toLowerCase().includes(query.toLowerCase());
+}
+
+const BADGE_LABELS = {
+  enqueue:'ENQ', dequeue:'DEQ',
+  run_start:'RUN ▶', run_done:'RUN ✓',
+  tool_start:'TOOL →', tool_end:'← TOOL',
+  session_state:'SESSION', error:'ERROR', warn:'WARN', other:'OTHER'
+};
+function badgeLabel(t) { return BADGE_LABELS[t] || t.toUpperCase(); }
+
+function fmtTime(ts) {
+  // Use provided timestamp, fallback to current time
+  let d;
+  if (ts) {
+    d = new Date(ts);
+    if (isNaN(d.getTime())) d = new Date(); // invalid date fallback
+  } else {
+    d = new Date();
+  }
+  return d.toLocaleTimeString('en-US', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* inline markdown renderer – no external dependency */
+function renderMd(src) {
+  src = String(src || '');
+  var lines = src.split('\n');
+  var html = '';
+  var inCode = false, codeBuf = '', codeLang = '';
+  var listStack = []; // track nested list depth
+
+  function closeList() {
+    while (listStack.length) { html += '</li></' + listStack.pop() + '>'; }
+  }
+  function inline(s) {
+    s = esc(s);
+    // images
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">');
+    // links
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // bold
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // italic
+    s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    s = s.replace(/_(.+?)_/g, '<em>$1</em>');
+    // strikethrough
+    s = s.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    // inline code
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    return s;
+  }
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    // --- fenced code block toggle ---
+    if (/^```/.test(line)) {
+      if (inCode) {
+        html += '<pre><code>' + esc(codeBuf) + '</code></pre>';
+        codeBuf = ''; inCode = false;
+      } else {
+        closeList();
+        codeLang = line.replace(/^```/, '').trim();
+        inCode = true;
+      }
+      continue;
+    }
+    if (inCode) { codeBuf += (codeBuf ? '\n' : '') + line; continue; }
+
+    // --- blank line ---
+    if (!line.trim()) { closeList(); continue; }
+
+    // --- heading ---
+    var hm = line.match(/^(#{1,6})\s+(.+)/);
+    if (hm) { closeList(); html += '<h'+hm[1].length+'>' + inline(hm[2]) + '</h'+hm[1].length+'>'; continue; }
+
+    // --- hr ---
+    if (/^[-*_]{3,}\s*$/.test(line)) { closeList(); html += '<hr>'; continue; }
+
+    // --- blockquote ---
+    if (/^>\s?/.test(line)) { closeList(); html += '<blockquote>' + inline(line.replace(/^>\s?/, '')) + '</blockquote>'; continue; }
+
+    // --- table ---
+    if (/^\|/.test(line) && /\|$/.test(line.trim())) {
+      closeList();
+      // collect all table lines
+      var tLines = [];
+      while (i < lines.length && /^\|/.test(lines[i]) && /\|$/.test(lines[i].trim())) {
+        tLines.push(lines[i]); i++;
+      }
+      i--; // back up one
+      if (tLines.length >= 2) {
+        html += '<table>';
+        // header
+        var hCells = tLines[0].split('|').filter(function(c){return c.trim()!=='';});
+        html += '<tr>' + hCells.map(function(c){return '<th>'+inline(c.trim())+'</th>';}).join('') + '</tr>';
+        // skip separator row (index 1)
+        for (var ti = 2; ti < tLines.length; ti++) {
+          var cells = tLines[ti].split('|').filter(function(c){return c.trim()!=='';});
+          html += '<tr>' + cells.map(function(c){return '<td>'+inline(c.trim())+'</td>';}).join('') + '</tr>';
+        }
+        html += '</table>';
+      }
+      continue;
+    }
+
+    // --- unordered list ---
+    var ulm = line.match(/^(\s*)([-*+])\s+(.*)/);
+    if (ulm) {
+      var content = ulm[3];
+      if (!listStack.length) { html += '<ul>'; listStack.push('ul'); }
+      else { html += '</li>'; }
+      html += '<li>' + inline(content);
+      continue;
+    }
+
+    // --- ordered list ---
+    var olm = line.match(/^(\s*)\d+\.\s+(.*)/);
+    if (olm) {
+      var content = olm[2];
+      if (!listStack.length) { html += '<ol>'; listStack.push('ol'); }
+      else { html += '</li>'; }
+      html += '<li>' + inline(content);
+      continue;
+    }
+
+    // --- paragraph ---
+    closeList();
+    html += '<p>' + inline(line) + '</p>';
+  }
+
+  // close any open blocks
+  if (inCode) html += '<pre><code>' + esc(codeBuf) + '</code></pre>';
+  closeList();
+  return html;
+}
+
+/* format token count (e.g. 12345 → 12.3K) */
+function fmtTokens(n) {
+  if (!n || n === 0) return '0';
+  if (n < 1000) return String(n);
+  if (n < 1000000) return (n / 1000).toFixed(1) + 'K';
+  return (n / 1000000).toFixed(2) + 'M';
+}
+
+/* format idle duration */
+function fmtIdleTime(idleSince) {
+  if (!idleSince) return i18n('idle');
+  const now = Date.now() / 1000;
+  const diff = now - idleSince;
+
+  if (diff < 60) return i18n('justNow');
+  if (diff < 3600) {
+    const mins = Math.floor(diff / 60);
+    return i18n('minutesAgo').replace('{0}', mins);
+  }
+  if (diff < 86400) {
+    const hours = Math.floor(diff / 3600);
+    return i18n('hoursAgo').replace('{0}', hours);
+  }
+  const days = Math.floor(diff / 86400);
+  return i18n('daysAgo').replace('{0}', days);
+}
+
+/* make UUID session ids clickable in live log messages */
+function linkSids(html) {
+  return html.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
+    '<span class="s-link" onclick="switchView(\'$1\')" title="Open session">$1</span>');
+}
+
+/* lightweight JSON syntax highlight on already-escaped text */
+function hlJson(s) {
+  return s
+    .replace(/&quot;([^&]*?)&quot;\s*:/g, '<span class="jk">&quot;$1&quot;:</span>')
+    .replace(/&quot;([^&]*?)&quot;/g,      '<span class="js">&quot;$1&quot;</span>')
+    .replace(/\b(\d+\.?\d*)\b/g,          '<span class="jn">$1</span>')
+    .replace(/\b(true|false|null)\b/g,    '<span class="jw">$1</span>');
+}
+
+/* ── bind UI events ───────────────────────────────────── */
+function bindAll() {
+  document.getElementById('btn-live').onclick = () => switchView('live');
+
+  // theme toggle
+  document.getElementById('theme-btn').onclick = toggleTheme;
+
+  // language toggle
+  document.getElementById('lang-btn').onclick = toggleLang;
+
+  // search box
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+
+  searchInput.addEventListener('input', function() {
+    S.searchQuery = this.value;
+    searchClear.classList.toggle('show', this.value.length > 0);
+    if (S.view === 'live') reRenderLive();
+  });
+
+  searchClear.onclick = () => {
+    searchInput.value = '';
+    S.searchQuery = '';
+    searchClear.classList.remove('show');
+    if (S.view === 'live') reRenderLive();
+  };
+
+  // filter pills
+  document.querySelectorAll('.fpill').forEach(btn => {
+    btn.onclick = () => {
+      S.filter = btn.dataset.f;
+      document.querySelectorAll('.fpill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (S.view === 'live') reRenderLive();
+    };
+  });
+
+  // auto-scroll toggle
+  document.getElementById('tog-scroll').onclick = function() {
+    S.autoScroll = !S.autoScroll;
+    localStorage.setItem('autoScroll', S.autoScroll);
+    this.classList.toggle('on', S.autoScroll);
+    if (S.autoScroll) { const el = document.getElementById('stream'); el.scrollTop = el.scrollHeight; }
+  };
+
+  // clear
+  document.getElementById('btn-clr').onclick = () => {
+    S.liveLogs = [];
+    document.getElementById('evt-cnt').textContent = '0';
+    document.getElementById('stream').innerHTML = '';
+  };
+
+  // scroll-to-top button
+  const stream = document.getElementById('stream');
+  const scrollTopBtn = document.getElementById('scroll-top-btn');
+  stream.addEventListener('scroll', () => {
+    scrollTopBtn.classList.toggle('show', stream.scrollTop > 200);
+  });
+  scrollTopBtn.onclick = () => {
+    stream.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+}
+</script>
+</body>
+</html>
