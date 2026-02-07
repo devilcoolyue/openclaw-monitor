@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import glob as globmod
 import hashlib
 import http.server
 import http.cookies
@@ -20,6 +21,7 @@ import os
 import re
 import sys
 import signal
+import threading
 import time
 from urllib.parse import urlparse
 from datetime import datetime
@@ -64,6 +66,12 @@ TODAY_LOG   = os.path.join(LOG_DIR, f"openclaw-{datetime.now().strftime('%Y-%m-%
 UUID_RE     = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)
 # Pattern for extracting timestamp from log lines (e.g., "2024-01-15 14:30:45" or "14:30:45.123")
 TS_RE       = re.compile(r'^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)')
+
+# ── SSE concurrency & rate limiting ─────────────────────────
+MAX_LOG_STREAMS     = 2           # max concurrent /api/logs/stream connections
+MAX_LOG_LINES_SEC   = 50          # throttle: max lines pushed per second
+_log_stream_count   = 0
+_log_stream_lock    = threading.Lock()
 
 # ── Auth System ──────────────────────────────────────────────
 AUTH_FILE      = os.path.join(BASE_DIR, '.auth')
@@ -399,48 +407,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ── SSE /api/logs/stream ────────────────────────────────
     def _api_log_stream(self):
-        _begin_sse(self)
-        proc = None
-        try:
-            proc = subprocess.Popen(
-                ['openclaw', 'logs', '--follow', '--json'],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        global _log_stream_count
 
-            for raw in iter(proc.stdout.readline, ''):
-                line = raw.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                except json.JSONDecodeError:
-                    data = {'raw': line}
-
-                if 'type' not in data:
-                    data['type'] = _classify(data.get('raw', ''))
-                if not data.get('raw'):
-                    data['raw'] = line
-
-                # Ensure timestamp exists - extract from JSON fields or raw line
-                if 'timestamp' not in data:
-                    ts = _extract_timestamp_from_data(data, line)
-                    if ts:
-                        data['timestamp'] = ts
-
-                if not _send_sse(self, 'log', data):
-                    break                          # client disconnected
-
-        except (FileNotFoundError, OSError):
-            # CLI unavailable → tail plain log file
-            if not _tail_plain_log(self):
+        # ── concurrency guard ──
+        with _log_stream_lock:
+            if _log_stream_count >= MAX_LOG_STREAMS:
+                _begin_sse(self)
                 _send_sse(self, 'status', {
                     'type': 'warn',
-                    'message': 'openclaw CLI not found and no log file available. '
-                               'Ensure openclaw is running.'
+                    'message': f'Too many log streams ({MAX_LOG_STREAMS} max). '
+                               'Close another tab and retry.'
+                })
+                return
+            _log_stream_count += 1
+
+        _begin_sse(self)
+        try:
+            if not _tail_log_file(self):
+                _send_sse(self, 'status', {
+                    'type': 'warn',
+                    'message': 'No log file available. Ensure openclaw is running.'
                 })
         finally:
-            if proc:
-                proc.terminate()
-                proc.wait()
+            with _log_stream_lock:
+                _log_stream_count -= 1
 
     # ── SSE /api/session/<id>/stream ────────────────────────
     def _api_session_stream(self, session_id):
@@ -508,41 +498,46 @@ def _json_resp(handler, obj):
     handler.wfile.write(body)
 
 
-# ── Tail plain log file (fallback) ───────────────────────────
-def _tail_plain_log(handler):
-    if not os.path.isfile(TODAY_LOG):
+# ── Tail log file directly (no gateway RPC) ─────────────────
+def _resolve_today_log():
+    """Find today's log file, fall back to most recent one."""
+    today = os.path.join(LOG_DIR,
+                         f"openclaw-{datetime.now().strftime('%Y-%m-%d')}.log")
+    if os.path.isfile(today):
+        return today
+    # fall back to newest log file in LOG_DIR
+    candidates = sorted(globmod.glob(os.path.join(LOG_DIR, 'openclaw-*.log')),
+                        key=os.path.getmtime, reverse=True)
+    return candidates[0] if candidates else None
+
+
+def _tail_log_file(handler):
+    log_file = _resolve_today_log()
+    if not log_file:
         return False
+
     proc = subprocess.Popen(
-        ['tail', '-f', '-n', '200', TODAY_LOG],
+        ['tail', '-f', '-n', '200', log_file],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
+        sent_this_sec = 0
+        window_start  = time.monotonic()
+
         for raw in iter(proc.stdout.readline, ''):
             line = raw.strip()
             if not line:
                 continue
 
-            data = None
-            # Only attempt JSON parse if line looks like JSON (starts with {)
-            if line[0] == '{':
-                try:
-                    data = json.loads(line)
-                    data.setdefault('raw', line)
-                except json.JSONDecodeError:
-                    pass
+            # ── rate limiting ──
+            now = time.monotonic()
+            if now - window_start >= 1.0:
+                sent_this_sec = 0
+                window_start  = now
+            if sent_this_sec >= MAX_LOG_LINES_SEC:
+                continue                       # drop excess lines
+            sent_this_sec += 1
 
-            if data is None:
-                # Plain text line - use regex for timestamp
-                ts = _extract_timestamp(line)
-                data = {'raw': line, 'type': _classify(line)}
-                if ts:
-                    data['timestamp'] = ts
-            else:
-                # JSON parsed - extract timestamp from fields
-                if 'type' not in data:
-                    data['type'] = _classify(line)
-                ts = _extract_timestamp_from_data(data, '')  # no regex fallback needed
-                if ts:
-                    data['timestamp'] = ts
+            data = _parse_log_line(line)
 
             if not _send_sse(handler, 'log', data):
                 break
@@ -550,6 +545,31 @@ def _tail_plain_log(handler):
         proc.terminate()
         proc.wait()
     return True
+
+
+def _parse_log_line(line: str) -> dict:
+    """Parse a single log line (JSON or plain text) into an SSE payload."""
+    data = None
+    if line and line[0] == '{':
+        try:
+            data = json.loads(line)
+            data.setdefault('raw', line)
+        except json.JSONDecodeError:
+            pass
+
+    if data is None:
+        ts = _extract_timestamp(line)
+        data = {'raw': line, 'type': _classify(line)}
+        if ts:
+            data['timestamp'] = ts
+    else:
+        if 'type' not in data:
+            data['type'] = _classify(line)
+        ts = _extract_timestamp_from_data(data, '')
+        if ts:
+            data['timestamp'] = ts
+
+    return data
 
 
 def _extract_timestamp(line: str) -> str | None:

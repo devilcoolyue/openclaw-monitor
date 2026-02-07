@@ -5,9 +5,10 @@ A real-time web dashboard for monitoring [OpenClaw](https://github.com/anthropic
 ## Features
 
 - **Session Management** — View all active/idle sessions with model info, token usage, and cost breakdown
-- **Real-time Log Streaming** — SSE-based live log viewer with type classification and filtering
+- **Real-time Log Streaming** — Direct file tail with SSE push, no gateway RPC overhead
 - **Session Detail View** — Inspect individual session messages including thinking blocks, tool calls, and tool results
 - **Token & Cost Tracking** — Per-session and per-model token usage with cost estimation
+- **Concurrency & Rate Limiting** — Max 2 concurrent log streams, 50 lines/sec throttle to prevent server overload
 - **Login Authentication** — Password-protected access with secure session cookies
 - **Tailscale Support** — Optionally bind to Tailscale interface for private network access
 - **Dark / Light Theme** — Toggle between dark and light mode
@@ -170,11 +171,12 @@ All endpoints except `/api/login` and `/api/logout` require authentication when 
 ### How It Works
 
 1. Reads session data from `~/.openclaw/agents/main/sessions/*.jsonl`
-2. Calls `openclaw` CLI for session listing and log streaming
-3. Falls back to direct file scanning when CLI is unavailable
-4. Serves a single-page dashboard via built-in HTTP server
-5. Uses Server-Sent Events (SSE) for real-time updates
-6. Managed as a systemd user service for reliable startup and auto-restart
+2. Calls `openclaw` CLI for session listing; falls back to direct file scanning when CLI is unavailable
+3. Streams logs by directly tailing `/tmp/openclaw/openclaw-YYYY-MM-DD.log` (bypasses gateway RPC for minimal resource usage)
+4. Enforces concurrency limits (max 2 SSE streams) and rate limiting (50 lines/sec) to protect low-memory servers
+5. Serves a single-page dashboard via built-in HTTP server
+6. Uses Server-Sent Events (SSE) for real-time updates
+7. Managed as a systemd user service for reliable startup and auto-restart
 
 ## License
 
