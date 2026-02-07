@@ -59,27 +59,33 @@ echo "  Location: $PROJECT_DIR"
 echo "  Port:     $PORT"
 echo ""
 
-# Prompt for admin password
-# Use /dev/tty so it works when piped from curl
-while true; do
-    read -s -p "  Set admin password: " PASSWORD < /dev/tty
+# ── Password setup ────────────────────────────────────────
+if [ -f "$AUTH_FILE" ]; then
+    echo "  Existing password found, keeping it."
+    echo "  (To reset, delete .auth and re-run install.sh)"
     echo ""
-    if [ -z "$PASSWORD" ]; then
-        echo "  Password cannot be empty. Try again."
-        continue
-    fi
-    read -s -p "  Confirm password:   " PASSWORD2 < /dev/tty
-    echo ""
-    if [ "$PASSWORD" = "$PASSWORD2" ]; then
-        break
-    fi
-    echo "  Passwords do not match. Try again."
-    echo ""
-done
+else
+    # Prompt for admin password
+    # Use /dev/tty so it works when piped from curl
+    while true; do
+        read -s -p "  Set admin password: " PASSWORD < /dev/tty
+        echo ""
+        if [ -z "$PASSWORD" ]; then
+            echo "  Password cannot be empty. Try again."
+            continue
+        fi
+        read -s -p "  Confirm password:   " PASSWORD2 < /dev/tty
+        echo ""
+        if [ "$PASSWORD" = "$PASSWORD2" ]; then
+            break
+        fi
+        echo "  Passwords do not match. Try again."
+        echo ""
+    done
 
-# Generate salt + SHA-256 hash using Python stdlib
-# Pass password via stdin to avoid shell escaping issues
-AUTH_ENTRY=$(printf '%s' "$PASSWORD" | python3 -c "
+    # Generate salt + SHA-256 hash using Python stdlib
+    # Pass password via stdin to avoid shell escaping issues
+    AUTH_ENTRY=$(printf '%s' "$PASSWORD" | python3 -c "
 import hashlib, secrets, sys
 password = sys.stdin.read()
 salt = secrets.token_hex(32)
@@ -87,11 +93,12 @@ h = hashlib.sha256((salt + password).encode()).hexdigest()
 print(salt + ':' + h)
 ")
 
-echo "$AUTH_ENTRY" > "$AUTH_FILE"
-chmod 600 "$AUTH_FILE"
+    echo "$AUTH_ENTRY" > "$AUTH_FILE"
+    chmod 600 "$AUTH_FILE"
+fi
 
 # Make scripts executable
-chmod +x scripts/start.sh scripts/check.sh scripts/install.sh 2>/dev/null || true
+chmod +x scripts/start.sh scripts/check.sh scripts/install.sh scripts/update.sh scripts/uninstall.sh bin/openclaw-monitor 2>/dev/null || true
 
 # ── Install systemd user service ──────────────────────────────
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
@@ -134,21 +141,34 @@ systemctl --user enable --now "$SERVICE_NAME" 2>/dev/null
 # Enable lingering so user services survive logout
 loginctl enable-linger "$(whoami)" 2>/dev/null || true
 
+# ── Install CLI symlink ───────────────────────────────────
+CLI_DIR="$HOME/.local/bin"
+CLI_LINK="$CLI_DIR/openclaw-monitor"
+mkdir -p "$CLI_DIR"
+ln -sf "$PROJECT_DIR/bin/openclaw-monitor" "$CLI_LINK"
+
 echo ""
-echo "  ✓ Password saved to .auth"
+echo "  ✓ Password configured"
 echo "  ✓ Scripts made executable"
 echo "  ✓ Systemd user service installed"
+echo "  ✓ CLI installed to $CLI_LINK"
+
+# Check if ~/.local/bin is in PATH
+if ! echo "$PATH" | tr ':' '\n' | grep -qx "$CLI_DIR"; then
+    echo ""
+    echo "  ⚠ $CLI_DIR is not in your PATH."
+    echo "  Add it by running:"
+    echo "    echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+fi
+
 echo ""
 echo "  Manage the service:"
-echo "    systemctl --user start $SERVICE_NAME     # Start"
-echo "    systemctl --user stop $SERVICE_NAME      # Stop"
-echo "    systemctl --user restart $SERVICE_NAME   # Restart"
-echo "    systemctl --user status $SERVICE_NAME    # Status & health check"
-echo "    journalctl --user -u $SERVICE_NAME -f    # View logs"
-echo ""
-echo "  Quick start:"
-echo "    systemctl --user start $SERVICE_NAME"
-echo ""
-echo "  Or use the helper script:"
-echo "    cd $PROJECT_DIR && ./scripts/start.sh"
+echo "    openclaw-monitor start       # Start"
+echo "    openclaw-monitor stop        # Stop"
+echo "    openclaw-monitor restart     # Restart"
+echo "    openclaw-monitor status      # Status & health check"
+echo "    openclaw-monitor logs        # View logs"
+echo "    openclaw-monitor update      # Pull latest & restart"
+echo "    openclaw-monitor uninstall   # Remove everything"
+echo "    openclaw-monitor version     # Show version"
 echo ""

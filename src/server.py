@@ -29,12 +29,34 @@ def _parse_args():
     p = argparse.ArgumentParser(description='openclaw Monitor server')
     p.add_argument('--port', type=int, default=18765, help='Port to listen on (default: 18765)')
     p.add_argument('--tailscale', action='store_true', help='Bind to Tailscale IP instead of 0.0.0.0')
+    p.add_argument('--version', action='store_true', help='Print version and exit')
     return p.parse_args()
 
 ARGS        = _parse_args()
 PORT        = ARGS.port
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVE_DIR   = os.path.join(BASE_DIR, 'public')
+
+# ── Version ──────────────────────────────────────────────────
+def _get_version():
+    """Read version from git: short hash + commit date."""
+    try:
+        r = subprocess.run(
+            ['git', 'log', '-1', '--format=%h %ci'],
+            capture_output=True, text=True, timeout=5, cwd=BASE_DIR)
+        if r.returncode == 0 and r.stdout.strip():
+            parts = r.stdout.strip().split()
+            h = parts[0]
+            date = parts[1] if len(parts) > 1 else ''
+            return {'hash': h, 'date': date, 'version': f'{h} ({date})'}
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return {'hash': 'unknown', 'date': '', 'version': 'unknown'}
+
+if ARGS.version:
+    print(_get_version()['version'])
+    sys.exit(0)
+
 SESSION_DIR = os.path.expanduser("~/.openclaw/agents/main/sessions")
 LOG_DIR     = "/tmp/openclaw"
 TODAY_LOG   = os.path.join(LOG_DIR, f"openclaw-{datetime.now().strftime('%Y-%m-%d')}.log")
@@ -224,9 +246,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
 
-        # Logout is always accessible (clears cookie)
+        # Logout and version are always accessible (no auth required)
         if path == '/api/logout':
             return self._api_logout()
+        if path == '/api/version':
+            return _json_resp(self, _get_version())
 
         # Auth check for all other routes
         is_api = path.startswith('/api/')
@@ -842,8 +866,10 @@ class _Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 # ── Entry point ──────────────────────────────────────────────
 if __name__ == '__main__':
     server = _Server((BIND_HOST, PORT), Handler)
+    ver = _get_version()
     url = f'http://{BIND_HOST}:{PORT}' if BIND_HOST != '0.0.0.0' else f'http://localhost:{PORT}'
     print(f'\n  openclaw Monitor  →  {url}')
+    print(f'  version         : {ver["version"]}')
     if AUTH_ENABLED:
         print(f'  auth            : enabled (password required)')
     else:
