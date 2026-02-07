@@ -27,34 +27,44 @@ A real-time web dashboard for monitoring [OpenClaw](https://github.com/anthropic
 
 ## Quick Start
 
+One-liner install on a fresh server:
+
 ```bash
-git clone https://github.com/<your-username>/openclaw-monitor.git
+curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
+```
+
+This will clone the repo to `/opt/openclaw-monitor`, prompt for an admin password, and make scripts executable.
+
+To install to a custom directory:
+
+```bash
+OPENCLAW_MONITOR_DIR=~/openclaw-monitor curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
+```
+
+Then start the server:
+
+```bash
+cd /opt/openclaw-monitor
+./scripts/start.sh
+```
+
+Open `http://<server-ip>:10100` in your browser.
+
+## Manual Installation
+
+```bash
+git clone https://github.com/devilcoolyue/openclaw-monitor.git
 cd openclaw-monitor
 
-# Install — set admin password
+# Set admin password
 ./scripts/install.sh
 
-# Start the monitor server (default port: 10100)
+# Start the server (default port: 10100)
 ./scripts/start.sh
 
 # Or run directly with a custom port
 python3 src/server.py --port 8888
 ```
-
-Open `http://localhost:10100` in your browser. If a password was set during install, you'll see a login page.
-
-## Installation
-
-Run the install script to set an admin password:
-
-```bash
-./scripts/install.sh
-```
-
-This will:
-1. Prompt for an admin password (hidden input)
-2. Generate a salted SHA-256 hash and save it to `.auth`
-3. Make `scripts/start.sh` and `scripts/check.sh` executable
 
 If you skip installation or delete `.auth`, the dashboard runs without authentication (open access).
 
