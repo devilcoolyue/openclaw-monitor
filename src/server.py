@@ -3,11 +3,16 @@
 openclaw Monitor — real-time dashboard backend (SSE)
 
 Usage:
-    python3 server.py          # default port 8888
-    python3 server.py --port 9999
+    python3 src/server.py                  # default port 8888
+    python3 src/server.py --port 9999
+    python3 src/server.py --tailscale      # bind to Tailscale IP
 """
 
+import argparse
+import hashlib
 import http.server
+import http.cookies
+import secrets
 import socketserver
 import subprocess
 import json
@@ -15,12 +20,21 @@ import os
 import re
 import sys
 import signal
+import time
 from urllib.parse import urlparse
 from datetime import datetime
 
-# ── Config ────────────────────────────────────────────────────
-PORT        = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[1] == '--port' else 8888
-SERVE_DIR   = os.path.dirname(os.path.abspath(__file__))
+# ── CLI Arguments ────────────────────────────────────────────
+def _parse_args():
+    p = argparse.ArgumentParser(description='openclaw Monitor server')
+    p.add_argument('--port', type=int, default=8888, help='Port to listen on (default: 8888)')
+    p.add_argument('--tailscale', action='store_true', help='Bind to Tailscale IP instead of 0.0.0.0')
+    return p.parse_args()
+
+ARGS        = _parse_args()
+PORT        = ARGS.port
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SERVE_DIR   = os.path.join(BASE_DIR, 'public')
 SESSION_DIR = os.path.expanduser("~/.openclaw/agents/main/sessions")
 LOG_DIR     = "/tmp/openclaw"
 TODAY_LOG   = os.path.join(LOG_DIR, f"openclaw-{datetime.now().strftime('%Y-%m-%d')}.log")
@@ -28,6 +42,149 @@ TODAY_LOG   = os.path.join(LOG_DIR, f"openclaw-{datetime.now().strftime('%Y-%m-%
 UUID_RE     = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)
 # Pattern for extracting timestamp from log lines (e.g., "2024-01-15 14:30:45" or "14:30:45.123")
 TS_RE       = re.compile(r'^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)')
+
+# ── Auth System ──────────────────────────────────────────────
+AUTH_FILE      = os.path.join(BASE_DIR, '.auth')
+SESSION_TTL    = 7 * 24 * 3600  # 7 days
+COOKIE_NAME    = 'monitor_sid'
+AUTH_SESSIONS  = {}  # token → expiry_timestamp
+
+def _load_auth():
+    """Load .auth file, return (salt, hash) or None if auth disabled."""
+    try:
+        with open(AUTH_FILE) as f:
+            line = f.read().strip()
+        if ':' in line:
+            salt, h = line.split(':', 1)
+            return (salt, h)
+    except (OSError, ValueError):
+        pass
+    return None
+
+def _verify_password(password):
+    """Check password against stored salt:hash."""
+    creds = _load_auth()
+    if not creds:
+        return False
+    salt, stored_hash = creds
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return secrets.compare_digest(h, stored_hash)
+
+def _create_session():
+    """Generate a new session token with TTL."""
+    token = secrets.token_hex(32)
+    AUTH_SESSIONS[token] = time.time() + SESSION_TTL
+    return token
+
+def _check_auth(handler):
+    """Check if request has a valid session cookie. Returns True if authenticated."""
+    cookie_header = handler.headers.get('Cookie', '')
+    if not cookie_header:
+        return False
+    cookies = http.cookies.SimpleCookie()
+    try:
+        cookies.load(cookie_header)
+    except http.cookies.CookieError:
+        return False
+    morsel = cookies.get(COOKIE_NAME)
+    if not morsel:
+        return False
+    token = morsel.value
+    expiry = AUTH_SESSIONS.get(token)
+    if not expiry:
+        return False
+    if time.time() > expiry:
+        del AUTH_SESSIONS[token]
+        return False
+    return True
+
+AUTH_ENABLED = _load_auth() is not None
+
+LOGIN_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>openclaw monitor — Login</title>
+<style>
+:root{--bg-0:#0a0e13;--bg-1:#111519;--bg-2:#161b22;--bg-3:#1c2330;--border:#1e2530;--t0:#e6edf3;--t1:#c9d1d9;--t2:#8b949e;--t3:#6e7681;--accent:#58a6ff;--green:#3fb950;--red:#ff7b72}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'SF Mono','Fira Code','Consolas','Courier New',monospace;background:var(--bg-0);color:var(--t1);display:flex;align-items:center;justify-content:center}
+.login-box{width:340px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:36px 30px 30px}
+.login-logo{font-size:16px;font-weight:700;color:var(--t0);text-align:center;margin-bottom:6px;letter-spacing:-.3px}
+.login-logo em{font-style:normal;color:var(--accent)}
+.login-sub{font-size:11px;color:var(--t3);text-align:center;margin-bottom:24px}
+.login-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--t3);font-weight:600;margin-bottom:6px;display:block}
+.login-input{width:100%;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-2);color:var(--t0);font-family:inherit;font-size:13px;outline:none;transition:border-color .15s}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{width:100%;margin-top:18px;padding:10px;border-radius:6px;border:none;background:var(--accent);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.login-btn:hover{opacity:.9}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-err{color:var(--red);font-size:11px;text-align:center;margin-top:12px;min-height:16px}
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="login-logo"><em>openclaw</em> monitor</div>
+  <div class="login-sub">Authentication required</div>
+  <form id="login-form">
+    <label class="login-label" for="pw">Password</label>
+    <input class="login-input" id="pw" type="password" autocomplete="current-password" autofocus>
+    <button class="login-btn" type="submit">Sign In</button>
+  </form>
+  <div class="login-err" id="err"></div>
+</div>
+<script>
+document.getElementById('login-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = this.querySelector('button');
+  const err = document.getElementById('err');
+  btn.disabled = true;
+  err.textContent = '';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: document.getElementById('pw').value})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      location.reload();
+    } else {
+      err.textContent = data.error || 'Invalid password';
+      btn.disabled = false;
+    }
+  } catch(ex) {
+    err.textContent = 'Connection error';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>'''
+
+# ── Tailscale binding ────────────────────────────────────────
+def _get_tailscale_ip():
+    """Detect Tailscale IPv4 address."""
+    try:
+        r = subprocess.run(['tailscale', 'ip', '-4'],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip().splitlines()[0]
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+BIND_HOST = '0.0.0.0'
+if ARGS.tailscale:
+    ts_ip = _get_tailscale_ip()
+    if ts_ip:
+        BIND_HOST = ts_ip
+    else:
+        print('\n  ERROR: --tailscale flag set but Tailscale is not available.')
+        print('  Ensure Tailscale is installed and running (`tailscale status`).\n')
+        sys.exit(1)
 
 
 # ── Request Handler ──────────────────────────────────────────
@@ -39,9 +196,42 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # suppress per-request logging
     def log_message(self, *_): pass
 
+    # ── auth guard ───────────────────────────────────────────
+    def _require_auth(self, api=False):
+        """Return True if request should be blocked (not authenticated).
+        For page requests, serves login HTML. For API requests, sends 401."""
+        if not AUTH_ENABLED:
+            return False
+        if _check_auth(self):
+            return False
+        if api:
+            body = json.dumps({'error': 'Unauthorized'}).encode()
+            self.send_response(401)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            body = LOGIN_HTML.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        return True
+
     # ── routing ─────────────────────────────────────────────
     def do_GET(self):
         path = urlparse(self.path).path
+
+        # Logout is always accessible (clears cookie)
+        if path == '/api/logout':
+            return self._api_logout()
+
+        # Auth check for all other routes
+        is_api = path.startswith('/api/')
+        if self._require_auth(api=is_api):
+            return
 
         if   path == '/api/sessions':            return self._api_sessions()
         elif path == '/api/health':              return self._api_health()
@@ -53,14 +243,82 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # everything else → static files (index.html)
         return super().do_GET()
 
+    def do_POST(self):
+        path = urlparse(self.path).path
+
+        # Login is always accessible (exempt from auth)
+        if path == '/api/login':
+            return self._api_login()
+
+        # Auth check for any other POST
+        if self._require_auth(api=True):
+            return
+
+        self.send_error(404, 'Not Found')
+
     def do_DELETE(self):
         path = urlparse(self.path).path
+
+        # Auth check
+        if self._require_auth(api=True):
+            return
 
         if path.startswith('/api/session/'):
             sid = path[len('/api/session/'):]
             return self._api_delete_session(sid)
 
         self.send_error(404, 'Not Found')
+
+    # ── POST /api/login ──────────────────────────────────────
+    def _api_login(self):
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+        except (json.JSONDecodeError, ValueError):
+            body = {}
+        password = body.get('password', '')
+
+        if _verify_password(password):
+            token = _create_session()
+            resp = json.dumps({'ok': True}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(resp)))
+            self.send_header('Set-Cookie',
+                f'{COOKIE_NAME}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}')
+            self.end_headers()
+            self.wfile.write(resp)
+        else:
+            resp = json.dumps({'ok': False, 'error': 'Invalid password'}).encode()
+            self.send_response(401)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+
+    # ── GET /api/logout ──────────────────────────────────────
+    def _api_logout(self):
+        # Invalidate server-side session
+        cookie_header = self.headers.get('Cookie', '')
+        if cookie_header:
+            cookies = http.cookies.SimpleCookie()
+            try:
+                cookies.load(cookie_header)
+                morsel = cookies.get(COOKIE_NAME)
+                if morsel and morsel.value in AUTH_SESSIONS:
+                    del AUTH_SESSIONS[morsel.value]
+            except http.cookies.CookieError:
+                pass
+
+        resp = json.dumps({'ok': True}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(resp)))
+        # Clear cookie
+        self.send_header('Set-Cookie',
+            f'{COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
+        self.end_headers()
+        self.wfile.write(resp)
 
     # ── DELETE /api/session/<id> ─────────────────────────────
     def _api_delete_session(self, session_id):
@@ -566,9 +824,16 @@ class _Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 # ── Entry point ──────────────────────────────────────────────
 if __name__ == '__main__':
-    server = _Server(('0.0.0.0', PORT), Handler)
-    print(f'\n  openclaw Monitor  →  http://localhost:{PORT}\n')
-    print(f'  session dir : {SESSION_DIR}')
-    print(f'  today log   : {TODAY_LOG}\n')
+    server = _Server((BIND_HOST, PORT), Handler)
+    url = f'http://{BIND_HOST}:{PORT}' if BIND_HOST != '0.0.0.0' else f'http://localhost:{PORT}'
+    print(f'\n  openclaw Monitor  →  {url}')
+    if AUTH_ENABLED:
+        print(f'  auth            : enabled (password required)')
+    else:
+        print(f'  auth            : disabled (no .auth file)')
+    if ARGS.tailscale:
+        print(f'  tailscale       : {BIND_HOST}')
+    print(f'  session dir     : {SESSION_DIR}')
+    print(f'  today log       : {TODAY_LOG}\n')
     signal.signal(signal.SIGINT, lambda *_: (server.shutdown(), sys.exit(0)))
     server.serve_forever()

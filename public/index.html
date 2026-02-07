@@ -178,6 +178,16 @@ a{color:inherit;text-decoration:none}
 }
 .lang-btn:hover{border-color:var(--border);color:var(--t0);background:var(--bg-3)}
 
+/* logout button */
+.logout-btn{
+  width:26px;height:26px;border-radius:5px;
+  border:1px solid transparent;background:transparent;
+  color:var(--t3);font-size:14px;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.logout-btn:hover{border-color:var(--red);color:var(--red);background:rgba(255,123,114,.08)}
+
 /* ═══════════════════════════════════════════════════════════
    MAIN
    ═══════════════════════════════════════════════════════════ */
@@ -474,6 +484,7 @@ a{color:inherit;text-decoration:none}
     <div class="sb-foot-right">
       <button class="lang-btn" id="lang-btn" title="切换语言/Language">中</button>
       <button class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
+      <button class="logout-btn" id="logout-btn" title="Logout">🚪</button>
     </div>
   </div>
 </aside>
@@ -1377,6 +1388,11 @@ function bindAll() {
 
   // language toggle
   document.getElementById('lang-btn').onclick = toggleLang;
+
+  // logout
+  document.getElementById('logout-btn').onclick = () => {
+    fetch('/api/logout').then(() => location.reload());
+  };
 
   // search box
   const searchInput = document.getElementById('search-input');

@@ -1,7 +1,7 @@
 #!/bin/bash
 # openclaw-monitor 进程检查脚本（用于 crontab）
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 PID_FILE="./monitor.pid"
 LOG_FILE="./monitor.log"
@@ -16,4 +16,4 @@ fi
 
 # 进程不存在，重新启动
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 检测到服务未运行，正在重启..." >> "$LOG_FILE"
-./start.sh >> "$LOG_FILE" 2>&1
+./scripts/start.sh >> "$LOG_FILE" 2>&1
