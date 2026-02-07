@@ -23,6 +23,7 @@ A real-time web dashboard for monitoring [OpenClaw](https://github.com/anthropic
 
 - Python 3.10+
 - OpenClaw CLI installed and accessible in `$PATH`
+- systemd (for user service management)
 - (Optional) Tailscale for private network binding
 
 ## Quick Start
@@ -33,77 +34,98 @@ One-liner install on a fresh server:
 curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
 ```
 
-This will clone the repo to `/opt/openclaw-monitor`, prompt for an admin password, and make scripts executable.
+This will clone the repo to `~/openclaw-monitor`, prompt for an admin password, and install a systemd user service.
 
 To install to a custom directory:
 
 ```bash
-OPENCLAW_MONITOR_DIR=~/openclaw-monitor curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
+OPENCLAW_MONITOR_DIR=~/my-monitor curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
 ```
 
-Then start the server:
+To use a custom port (default: 18765):
 
 ```bash
-cd /opt/openclaw-monitor
-./scripts/start.sh
+OPENCLAW_MONITOR_PORT=9999 curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
 ```
 
-Open `http://<server-ip>:10100` in your browser.
+Then start the service:
+
+```bash
+systemctl --user start openclaw-monitor
+```
+
+Open `http://<server-ip>:18765` in your browser.
 
 ## Manual Installation
 
 ```bash
-git clone https://github.com/devilcoolyue/openclaw-monitor.git
-cd openclaw-monitor
+git clone https://github.com/devilcoolyue/openclaw-monitor.git ~/openclaw-monitor
+cd ~/openclaw-monitor
 
-# Set admin password
+# Set admin password and install systemd service
 ./scripts/install.sh
 
-# Start the server (default port: 10100)
-./scripts/start.sh
+# Start the service (default port: 18765)
+systemctl --user start openclaw-monitor
 
 # Or run directly with a custom port
-python3 src/server.py --port 8888
+python3 src/server.py --port 9999
 ```
 
 If you skip installation or delete `.auth`, the dashboard runs without authentication (open access).
 
 ## Usage
 
-### Start / Stop
+### Service Management
 
 ```bash
-# Start (background, with PID tracking)
-./scripts/start.sh
-
-# Start with Tailscale binding (private network only)
-./scripts/start.sh --tailscale
-
-# Check if running (suitable for crontab)
-./scripts/check.sh
+# Start
+systemctl --user start openclaw-monitor
 
 # Stop
-kill $(cat monitor.pid)
+systemctl --user stop openclaw-monitor
+
+# Restart
+systemctl --user restart openclaw-monitor
+
+# Status & health check
+systemctl --user status openclaw-monitor
+
+# View logs
+journalctl --user -u openclaw-monitor -f
+
+# Enable auto-start on login
+systemctl --user enable openclaw-monitor
+
+# Disable auto-start
+systemctl --user disable openclaw-monitor
+```
+
+Or use the helper scripts:
+
+```bash
+# Start (delegates to systemctl if service is installed)
+./scripts/start.sh
+
+# Health check
+./scripts/check.sh
 ```
 
 ### Tailscale Binding
 
-Use the `--tailscale` flag to bind the server to your Tailscale IP instead of `0.0.0.0`:
+Use the `--tailscale` flag during installation to bind the server to your Tailscale IP:
 
 ```bash
-./scripts/start.sh --tailscale
-# or directly:
-python3 src/server.py --port 8888 --tailscale
+./scripts/install.sh --tailscale
+```
+
+Or run directly:
+
+```bash
+python3 src/server.py --port 18765 --tailscale
 ```
 
 This makes the dashboard accessible only through your Tailscale network. Requires Tailscale to be installed and running.
-
-### Auto-restart with crontab
-
-```bash
-# Check every minute, restart if not running
-* * * * * /path/to/openclaw-monitor/scripts/check.sh
-```
 
 ## Architecture
 
@@ -114,9 +136,9 @@ openclaw-monitor/
 ├── public/
 │   └── index.html         # Single-page dashboard (HTML + CSS + JS)
 ├── scripts/
-│   ├── install.sh         # Installation script (password setup)
-│   ├── start.sh           # Startup script with PID management
-│   └── check.sh           # Health check script for crontab
+│   ├── install.sh         # Installation script (password setup + systemd service)
+│   ├── start.sh           # Startup helper (delegates to systemctl)
+│   └── check.sh           # Health check script (delegates to systemctl)
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -152,6 +174,7 @@ All endpoints except `/api/login` and `/api/logout` require authentication when 
 3. Falls back to direct file scanning when CLI is unavailable
 4. Serves a single-page dashboard via built-in HTTP server
 5. Uses Server-Sent Events (SSE) for real-time updates
+6. Managed as a systemd user service for reliable startup and auto-restart
 
 ## License
 

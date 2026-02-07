@@ -137,6 +137,164 @@ a{color:inherit;text-decoration:none}
 .empty .ei{font-size:26px}
 .empty p{font-size:12px}
 
+/* ═══════════════════════════════════════════════════════════
+   BOOT SCREEN (detection overlay)
+   ═══════════════════════════════════════════════════════════ */
+.boot-screen{
+  position:fixed;inset:0;z-index:9998;
+  background:var(--bg-0);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .5s ease,visibility .5s ease;
+}
+.boot-screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.boot-box{
+  width:420px;
+  text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:24px;
+}
+.boot-logo{font-size:20px;font-weight:700;color:var(--t0);letter-spacing:-.5px}
+.boot-logo em{font-style:normal;color:var(--accent)}
+
+/* spinner ring */
+.boot-spinner{
+  width:56px;height:56px;
+  border:3px solid var(--border);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:boot-spin 1s linear infinite;
+}
+.boot-spinner.ok{
+  border-color:var(--green);
+  border-top-color:var(--green);
+  animation:boot-pop .35s ease forwards;
+}
+.boot-spinner.fail{
+  border-color:var(--red);
+  border-top-color:var(--red);
+  animation:boot-pop .35s ease forwards;
+}
+@keyframes boot-spin{to{transform:rotate(360deg)}}
+@keyframes boot-pop{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.15)}
+  100%{transform:scale(1)}
+}
+
+/* check icon inside spinner */
+.boot-icon{
+  width:56px;height:56px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;
+  opacity:0;
+  position:absolute;
+  transition:opacity .3s ease;
+}
+.boot-icon.show{opacity:1}
+.boot-spinner-wrap{position:relative;width:56px;height:56px}
+
+/* step list */
+.boot-steps{
+  display:flex;flex-direction:column;gap:10px;
+  width:100%;max-width:320px;text-align:left;
+}
+.boot-step{
+  display:flex;align-items:center;gap:10px;
+  font-size:12px;color:var(--t3);
+  transition:color .3s ease;
+}
+.boot-step.active{color:var(--t1)}
+.boot-step.done{color:var(--green)}
+.boot-step.fail{color:var(--red)}
+
+.boot-step-icon{
+  width:22px;height:22px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;flex-shrink:0;
+  border:1.5px solid var(--border);
+  background:var(--bg-2);
+  transition:all .3s ease;
+}
+.boot-step.active .boot-step-icon{
+  border-color:var(--accent);
+  background:rgba(88,166,255,.1);
+  animation:boot-step-pulse 1.5s ease-in-out infinite;
+}
+.boot-step.done .boot-step-icon{
+  border-color:var(--green);
+  background:rgba(63,185,80,.15);
+  color:var(--green);
+}
+.boot-step.fail .boot-step-icon{
+  border-color:var(--red);
+  background:rgba(255,123,114,.1);
+  color:var(--red);
+}
+@keyframes boot-step-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(88,166,255,.3)}
+  50%{box-shadow:0 0 0 6px rgba(88,166,255,0)}
+}
+
+.boot-step-text{flex:1}
+.boot-step-sub{font-size:10px;color:var(--t3);margin-top:1px}
+
+/* progress bar under steps */
+.boot-progress{
+  width:100%;max-width:320px;height:3px;
+  background:var(--bg-3);border-radius:2px;
+  overflow:hidden;
+}
+.boot-progress-bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--accent),var(--green));
+  border-radius:2px;
+  transition:width .6s ease;
+}
+.boot-progress-bar.fail{
+  background:linear-gradient(90deg,var(--accent),var(--red));
+}
+
+/* not detected state */
+.boot-alert{
+  display:none;flex-direction:column;align-items:center;gap:16px;
+  width:100%;max-width:340px;
+}
+.boot-alert.show{display:flex}
+.boot-alert-icon{font-size:40px;opacity:.8}
+.boot-alert-title{font-size:15px;font-weight:700;color:var(--red)}
+.boot-alert-desc{font-size:12px;color:var(--t2);line-height:1.6;text-align:center}
+.boot-alert-hint{
+  font-size:11px;color:var(--t3);
+  background:var(--bg-2);border:1px solid var(--border);
+  border-radius:6px;padding:12px 16px;
+  text-align:left;width:100%;
+  font-family:inherit;line-height:1.7;
+}
+.boot-alert-hint code{
+  background:var(--bg-3);color:var(--orange);
+  padding:1px 5px;border-radius:3px;font-size:11px;
+}
+.boot-retry-btn{
+  padding:8px 24px;border-radius:6px;
+  border:1px solid var(--accent);background:rgba(88,166,255,.1);
+  color:var(--accent);font-family:inherit;font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .2s;
+}
+.boot-retry-btn:hover{background:rgba(88,166,255,.2);box-shadow:0 0 12px rgba(88,166,255,.15)}
+
+/* detected info bar */
+.boot-info{
+  display:none;flex-direction:column;gap:6px;
+  width:100%;max-width:320px;
+  background:var(--bg-2);border:1px solid var(--border);
+  border-radius:6px;padding:10px 14px;
+  text-align:left;
+}
+.boot-info.show{display:flex}
+.boot-info-row{display:flex;justify-content:space-between;font-size:11px}
+.boot-info-label{color:var(--t3)}
+.boot-info-val{color:var(--t0);font-weight:600}
+
 /* scroll-to-top button */
 .scroll-top-btn{
   position:absolute;bottom:24px;right:24px;
@@ -453,6 +611,67 @@ a{color:inherit;text-decoration:none}
 </head>
 <body>
 
+<!-- ═══ BOOT SCREEN ═══════════════════════════════════════ -->
+<div class="boot-screen" id="boot-screen">
+  <div class="boot-box">
+    <div class="boot-logo"><em>openclaw</em> monitor</div>
+
+    <div class="boot-spinner-wrap">
+      <div class="boot-spinner" id="boot-spinner"></div>
+      <div class="boot-icon" id="boot-icon"></div>
+    </div>
+
+    <div class="boot-steps" id="boot-steps">
+      <div class="boot-step" id="boot-step-proc">
+        <span class="boot-step-icon">1</span>
+        <div>
+          <div class="boot-step-text" id="boot-step-proc-text">Detecting openclaw process…</div>
+        </div>
+      </div>
+      <div class="boot-step" id="boot-step-log">
+        <span class="boot-step-icon">2</span>
+        <div>
+          <div class="boot-step-text" id="boot-step-log-text">Locating log files…</div>
+        </div>
+      </div>
+      <div class="boot-step" id="boot-step-sess">
+        <span class="boot-step-icon">3</span>
+        <div>
+          <div class="boot-step-text" id="boot-step-sess-text">Loading sessions…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="boot-progress"><div class="boot-progress-bar" id="boot-progress"></div></div>
+
+    <!-- shown when openclaw is not detected -->
+    <div class="boot-alert" id="boot-alert">
+      <div class="boot-alert-icon">⚠</div>
+      <div class="boot-alert-title" id="boot-alert-title">openclaw not detected</div>
+      <div class="boot-alert-desc" id="boot-alert-desc">
+        The openclaw process is not running or not accessible on this server.
+      </div>
+      <div class="boot-alert-hint" id="boot-alert-hint">
+        Make sure openclaw is installed and running:<br>
+        <code>openclaw</code>
+      </div>
+      <button class="boot-retry-btn" id="boot-retry" onclick="bootCheck()">Retry</button>
+    </div>
+
+    <!-- env info shown on success -->
+    <div class="boot-info" id="boot-info">
+      <div class="boot-info-row">
+        <span class="boot-info-label" id="boot-info-sess-label">Session Dir</span>
+        <span class="boot-info-val" id="boot-info-sess-val">—</span>
+      </div>
+      <div class="boot-info-row">
+        <span class="boot-info-label" id="boot-info-log-label">Today Log</span>
+        <span class="boot-info-val" id="boot-info-log-val">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -522,6 +741,7 @@ a{color:inherit;text-decoration:none}
     <div class="ss-row-top">
       <div class="ss-item"><span class="ss-label">Session</span><span class="ss-val" id="ss-id">—</span></div>
       <div class="ss-item"><span class="ss-label">Provider</span><span class="ss-val" id="ss-provider">—</span></div>
+      <div class="ss-item"><span class="ss-label">Model</span><span class="ss-val" id="ss-model">—</span></div>
       <div class="ss-item"><span class="ss-label">Messages</span><span class="ss-val" id="ss-msgs">—</span></div>
       <div class="ss-item"><span class="ss-label">Status</span><span class="ss-val" id="ss-status">—</span></div>
       <div class="ss-item"><span class="ss-label">Tokens</span><span class="ss-val" id="ss-tokens">—</span></div>
@@ -678,10 +898,154 @@ document.addEventListener('DOMContentLoaded', () => {
   initLang();
   initAutoScroll();
   bindAll();
-  loadSessions();
-  switchView('live');
-  setInterval(loadSessions, 5000);   // refresh session list
+  bootCheck();  // start detection flow instead of immediately loading
 });
+
+/* ═══════════════════════════════════════════════════════════
+   BOOT DETECTION FLOW
+   ═══════════════════════════════════════════════════════════ */
+async function bootCheck() {
+  const screen   = document.getElementById('boot-screen');
+  const spinner  = document.getElementById('boot-spinner');
+  const icon     = document.getElementById('boot-icon');
+  const progress = document.getElementById('boot-progress');
+  const alert    = document.getElementById('boot-alert');
+  const info     = document.getElementById('boot-info');
+
+  // reset state
+  screen.classList.remove('hidden');
+  spinner.className = 'boot-spinner';
+  icon.className = 'boot-icon';
+  icon.textContent = '';
+  alert.classList.remove('show');
+  info.classList.remove('show');
+  progress.style.width = '0%';
+  progress.classList.remove('fail');
+  ['boot-step-proc','boot-step-log','boot-step-sess'].forEach(id => {
+    const el = document.getElementById(id);
+    el.className = 'boot-step';
+  });
+
+  // update boot screen i18n text
+  updateBootText();
+
+  // ── Step 1: detect openclaw process ──
+  setBootStep('boot-step-proc', 'active');
+  progress.style.width = '15%';
+
+  await sleep(400);
+
+  let health;
+  try {
+    const res = await fetch('/api/health');
+    health = await res.json();
+  } catch (e) {
+    health = { openclaw_available: false, session_dir_exists: false, today_log_exists: false };
+  }
+
+  progress.style.width = '33%';
+
+  if (!health.openclaw_available && !health.session_dir_exists) {
+    // not detected
+    setBootStep('boot-step-proc', 'fail');
+    spinner.className = 'boot-spinner fail';
+    icon.className = 'boot-icon show';
+    icon.textContent = '✕';
+    progress.classList.add('fail');
+    progress.style.width = '33%';
+    alert.classList.add('show');
+    updateBootAlertText(health);
+    return;
+  }
+
+  setBootStep('boot-step-proc', 'done');
+  await sleep(300);
+
+  // ── Step 2: locate log files ──
+  setBootStep('boot-step-log', 'active');
+  progress.style.width = '50%';
+  await sleep(400);
+
+  const logExists = health.today_log_exists;
+  const sessExists = health.session_dir_exists;
+
+  setBootStep('boot-step-log', 'done');
+  progress.style.width = '66%';
+  await sleep(300);
+
+  // ── Step 3: load sessions ──
+  setBootStep('boot-step-sess', 'active');
+  progress.style.width = '80%';
+
+  try {
+    S.sessions = await (await fetch('/api/sessions')).json();
+    renderSessions();
+  } catch(e) {
+    S.sessions = [];
+  }
+
+  setBootStep('boot-step-sess', 'done');
+  progress.style.width = '100%';
+
+  // show env info
+  info.classList.add('show');
+  document.getElementById('boot-info-sess-val').textContent = sessExists ? '✓' : '—';
+  document.getElementById('boot-info-log-val').textContent  = logExists  ? '✓' : '—';
+  if (health.output) {
+    document.getElementById('boot-info-sess-val').textContent = sessExists ? '✓ found' : '✕ missing';
+    document.getElementById('boot-info-log-val').textContent  = logExists  ? '✓ found' : '✕ missing';
+  }
+
+  // success
+  spinner.className = 'boot-spinner ok';
+  icon.className = 'boot-icon show';
+  icon.textContent = '✓';
+
+  await sleep(800);
+
+  // fade out and enter dashboard
+  screen.classList.add('hidden');
+  switchView('live');
+  setInterval(loadSessions, 5000);
+}
+
+function setBootStep(id, state) {
+  const el = document.getElementById(id);
+  el.className = 'boot-step ' + state;
+  const iconEl = el.querySelector('.boot-step-icon');
+  if (state === 'done')      iconEl.textContent = '✓';
+  else if (state === 'fail') iconEl.textContent = '✕';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function updateBootText() {
+  document.getElementById('boot-step-proc-text').textContent =
+    S.lang === 'zh' ? '检测 openclaw 进程…' : 'Detecting openclaw process…';
+  document.getElementById('boot-step-log-text').textContent =
+    S.lang === 'zh' ? '探测日志文件位置…' : 'Locating log files…';
+  document.getElementById('boot-step-sess-text').textContent =
+    S.lang === 'zh' ? '加载会话数据…' : 'Loading sessions…';
+}
+
+function updateBootAlertText(health) {
+  const titleEl = document.getElementById('boot-alert-title');
+  const descEl  = document.getElementById('boot-alert-desc');
+  const hintEl  = document.getElementById('boot-alert-hint');
+  const retryEl = document.getElementById('boot-retry');
+
+  if (S.lang === 'zh') {
+    titleEl.textContent = '未检测到 openclaw';
+    descEl.textContent  = 'openclaw 进程未运行或无法访问。';
+    hintEl.innerHTML    = '请确保 openclaw 已安装并正在运行：<br><code>openclaw</code>';
+    retryEl.textContent = '重试';
+  } else {
+    titleEl.textContent = 'openclaw not detected';
+    descEl.textContent  = 'The openclaw process is not running or not accessible on this server.';
+    hintEl.innerHTML    = 'Make sure openclaw is installed and running:<br><code>openclaw</code>';
+    retryEl.textContent = 'Retry';
+  }
+}
 
 /* ── theme management ───────────────────────────────────── */
 function initTheme() {
@@ -890,6 +1254,7 @@ function switchView(id) {
     document.getElementById('sess-summary').style.display = '';
     document.getElementById('ss-id').textContent       = id;
     document.getElementById('ss-provider').textContent = sess?.provider || '—';
+    document.getElementById('ss-model').textContent    = sess?.model || '—';
     document.getElementById('ss-msgs').textContent     = sess?.message_count || '—';
     const status = sess?.status || 'idle';
     document.getElementById('ss-status').textContent   = status === 'processing' ? i18n('processing') : i18n('idle');

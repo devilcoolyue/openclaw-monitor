@@ -3,7 +3,7 @@
 openclaw Monitor — real-time dashboard backend (SSE)
 
 Usage:
-    python3 src/server.py                  # default port 8888
+    python3 src/server.py                  # default port 18765
     python3 src/server.py --port 9999
     python3 src/server.py --tailscale      # bind to Tailscale IP
 """
@@ -27,7 +27,7 @@ from datetime import datetime
 # ── CLI Arguments ────────────────────────────────────────────
 def _parse_args():
     p = argparse.ArgumentParser(description='openclaw Monitor server')
-    p.add_argument('--port', type=int, default=8888, help='Port to listen on (default: 8888)')
+    p.add_argument('--port', type=int, default=18765, help='Port to listen on (default: 18765)')
     p.add_argument('--tailscale', action='store_true', help='Bind to Tailscale IP instead of 0.0.0.0')
     return p.parse_args()
 
@@ -327,9 +327,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(400, 'Invalid session ID format')
             return
 
-        session_file = os.path.join(SESSION_DIR, f'{session_id}.jsonl')
-        if not os.path.isfile(session_file):
-            self.send_error(404, 'Session not found')
+        session_file = _find_session_file(session_id)
+        if not session_file:
+            # file already gone — treat as success
+            _json_resp(self, {'success': True, 'id': session_id})
             return
 
         try:
@@ -570,6 +571,22 @@ def _classify(line: str) -> str:
     if 'error' in ll:                            return 'error'
     if 'warn'  in ll:                            return 'warn'
     return 'other'
+
+
+def _find_session_file(session_id: str):
+    """Locate session JSONL file — check SESSION_DIR first, then search ~/.openclaw."""
+    # standard path
+    path = os.path.join(SESSION_DIR, f'{session_id}.jsonl')
+    if os.path.isfile(path):
+        return path
+    # search under ~/.openclaw recursively
+    oc_root = os.path.expanduser('~/.openclaw')
+    fname = f'{session_id}.jsonl'
+    if os.path.isdir(oc_root):
+        for dirpath, _, filenames in os.walk(oc_root):
+            if fname in filenames:
+                return os.path.join(dirpath, fname)
+    return None
 
 
 def _parse_oc_sessions(output: str) -> list:

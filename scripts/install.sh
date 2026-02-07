@@ -8,7 +8,9 @@
 set -e
 
 REPO_URL="https://github.com/devilcoolyue/openclaw-monitor.git"
-INSTALL_DIR="${OPENCLAW_MONITOR_DIR:-/opt/openclaw-monitor}"
+INSTALL_DIR="${OPENCLAW_MONITOR_DIR:-$HOME/openclaw-monitor}"
+PORT="${OPENCLAW_MONITOR_PORT:-18765}"
+SERVICE_NAME="openclaw-monitor"
 
 # ── Detect if running inside the repo or via curl pipe ────────
 if [ -f "src/server.py" ]; then
@@ -54,6 +56,7 @@ echo ""
 echo "  openclaw-monitor — Setup"
 echo "  ────────────────────────"
 echo "  Location: $PROJECT_DIR"
+echo "  Port:     $PORT"
 echo ""
 
 # Prompt for admin password
@@ -90,16 +93,62 @@ chmod 600 "$AUTH_FILE"
 # Make scripts executable
 chmod +x scripts/start.sh scripts/check.sh scripts/install.sh 2>/dev/null || true
 
+# ── Install systemd user service ──────────────────────────────
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+SERVICE_FILE="$SYSTEMD_USER_DIR/${SERVICE_NAME}.service"
+
+mkdir -p "$SYSTEMD_USER_DIR"
+
+# Detect extra args for Tailscale
+EXTRA_ARGS=""
+for arg in "$@"; do
+    case "$arg" in
+        --tailscale) EXTRA_ARGS="$EXTRA_ARGS --tailscale" ;;
+    esac
+done
+
+cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=openclaw Monitor Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$(command -v python3) $PROJECT_DIR/src/server.py --port $PORT $EXTRA_ARGS
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:$PROJECT_DIR/monitor.log
+StandardError=append:$PROJECT_DIR/monitor.log
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Reload systemd user daemon
+systemctl --user daemon-reload
+
+# Enable and start the service
+systemctl --user enable --now "$SERVICE_NAME" 2>/dev/null
+
+# Enable lingering so user services survive logout
+loginctl enable-linger "$(whoami)" 2>/dev/null || true
+
 echo ""
 echo "  ✓ Password saved to .auth"
 echo "  ✓ Scripts made executable"
+echo "  ✓ Systemd user service installed"
 echo ""
-echo "  Start the server:"
+echo "  Manage the service:"
+echo "    systemctl --user start $SERVICE_NAME     # Start"
+echo "    systemctl --user stop $SERVICE_NAME      # Stop"
+echo "    systemctl --user restart $SERVICE_NAME   # Restart"
+echo "    systemctl --user status $SERVICE_NAME    # Status & health check"
+echo "    journalctl --user -u $SERVICE_NAME -f    # View logs"
+echo ""
+echo "  Quick start:"
+echo "    systemctl --user start $SERVICE_NAME"
+echo ""
+echo "  Or use the helper script:"
 echo "    cd $PROJECT_DIR && ./scripts/start.sh"
-echo ""
-echo "  Start with Tailscale binding:"
-echo "    cd $PROJECT_DIR && ./scripts/start.sh --tailscale"
-echo ""
-echo "  Auto-restart (add to crontab):"
-echo "    * * * * * $PROJECT_DIR/scripts/check.sh"
 echo ""
