@@ -759,7 +759,60 @@ a{color:inherit;text-decoration:none}
 
   /* ── Scroll-to-top button ── */
   .scroll-top-btn{bottom:16px;right:16px}
+
+  /* ── System dashboard responsive ── */
+  .sys-grid{grid-template-columns:1fr!important}
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SYSTEM DASHBOARD
+   ═══════════════════════════════════════════════════════════ */
+.sys-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;border-bottom:1px solid var(--border);
+  background:var(--bg-2);flex-shrink:0;
+}
+.sys-toolbar-left{font-size:11px;color:var(--t3)}
+.sys-refresh-btn{
+  padding:4px 12px;border-radius:5px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--t2);font-size:11px;font-family:inherit;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:5px;
+}
+.sys-refresh-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.06)}
+.sys-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  padding:16px 18px;
+}
+.sys-card{
+  background:var(--bg-1);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;
+}
+.sys-card-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;border-bottom:1px solid var(--border);
+  background:var(--bg-2);
+  font-size:12px;font-weight:600;color:var(--t0);
+}
+.sys-card-hdr .sys-icon{font-size:14px;flex-shrink:0}
+.sys-card-body{padding:10px 14px;font-size:11px;color:var(--t1);max-height:320px;overflow-y:auto}
+.sys-card-body:empty::after{content:'—';color:var(--t3)}
+.sys-kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)}
+.sys-kv:last-child{border-bottom:none}
+.sys-kv-key{color:var(--t2);flex-shrink:0;margin-right:10px}
+.sys-kv-val{color:var(--t0);text-align:right;word-break:break-all}
+.sys-badge-ok{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(63,185,80,.15);color:var(--green);text-transform:uppercase}
+.sys-badge-warn{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(227,179,65,.12);color:var(--yellow);text-transform:uppercase}
+.sys-badge-err{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(255,123,114,.15);color:var(--red);text-transform:uppercase}
+.sys-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:var(--bg-3);border:1px solid var(--border);color:var(--t1);margin:2px}
+.sys-bar{height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden;margin:4px 0}
+.sys-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.sys-bar-fill.ok{background:var(--green)}
+.sys-bar-fill.warn{background:var(--orange)}
+.sys-bar-fill.err{background:var(--red)}
+.sys-pre{background:var(--bg-2);border-radius:4px;padding:8px 10px;font-size:10px;color:var(--t2);white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;margin:4px 0}
+.sys-empty{color:var(--t3);font-size:11px;padding:8px 0;text-align:center}
 </style>
 </head>
 <body>
@@ -840,6 +893,10 @@ a{color:inherit;text-decoration:none}
       <span class="nb-icon">⚡</span>
       <span class="nb-label">Live Logs</span>
       <span class="nb-badge" id="evt-cnt">0</span>
+    </button>
+    <button class="nav-btn" id="btn-system">
+      <span class="nb-icon">📊</span>
+      <span class="nb-label">System</span>
     </button>
   </div>
 
@@ -924,7 +981,7 @@ a{color:inherit;text-decoration:none}
 <script>
 /* ── state ──────────────────────────────────────────────── */
 const S = {
-  view:        'live',   // 'live' | sessionId
+  view:        'live',   // 'live' | 'system' | sessionId
   filter:      'all',
   autoScroll:  true,
   sessions:    [],
@@ -934,6 +991,8 @@ const S = {
   searchQuery: '',       // search query
   theme:       'dark',   // 'dark' | 'light'
   lang:        'zh',     // 'en' | 'zh'
+  systemData:  null,
+  systemTimer: null,
 };
 
 /* ── i18n (国际化) ────────────────────────────────────────── */
@@ -987,6 +1046,30 @@ const I18N = {
     minutesAgo: '{0}m ago',
     hoursAgo: '{0}h ago',
     daysAgo: '{0}d ago',
+    // System view
+    system: 'System',
+    sysRefresh: 'Refresh',
+    sysLastUpdate: 'Last updated',
+    sysChannelHealth: 'Channel Health',
+    sysDiagnostics: 'System Diagnostics',
+    sysPresence: 'Heartbeat & Presence',
+    sysContextWindow: 'Context Window',
+    sysPromptReport: 'System Prompt Report',
+    sysSkillsSnapshot: 'Skills Snapshot',
+    sysCompaction: 'Compaction History',
+    sysDevices: 'Devices',
+    sysCronJobs: 'Cron Jobs',
+    sysUpdateCheck: 'Update Check',
+    sysExecApprovals: 'Exec Approvals',
+    sysPaired: 'Paired',
+    sysPending: 'Pending',
+    sysNoData: 'No data available',
+    sysNoJobs: 'No cron jobs configured',
+    sysVersion: 'Version',
+    sysLastChecked: 'Last Checked',
+    sysSocket: 'Socket',
+    sysCompactions: 'compactions',
+    sysLoading: 'Loading system data…',
   },
   zh: {
     liveLogs: '实时日志',
@@ -1037,6 +1120,30 @@ const I18N = {
     minutesAgo: '{0}分钟前',
     hoursAgo: '{0}小时前',
     daysAgo: '{0}天前',
+    // System view
+    system: '系统',
+    sysRefresh: '刷新',
+    sysLastUpdate: '上次更新',
+    sysChannelHealth: '通道状态',
+    sysDiagnostics: '系统诊断',
+    sysPresence: '心跳 & 在线状态',
+    sysContextWindow: '上下文窗口',
+    sysPromptReport: '系统提示报告',
+    sysSkillsSnapshot: '技能快照',
+    sysCompaction: '压缩历史',
+    sysDevices: '设备',
+    sysCronJobs: '定时任务',
+    sysUpdateCheck: '更新检查',
+    sysExecApprovals: '执行审批',
+    sysPaired: '已配对',
+    sysPending: '待确认',
+    sysNoData: '暂无数据',
+    sysNoJobs: '未配置定时任务',
+    sysVersion: '版本',
+    sysLastChecked: '上次检查',
+    sysSocket: 'Socket',
+    sysCompactions: '次压缩',
+    sysLoading: '正在加载系统数据…',
   }
 };
 
@@ -1286,10 +1393,13 @@ function updateAllText() {
   // Sidebar
   document.querySelector('.sb-label').innerHTML = `${i18n('sessions')} <span id="sess-active" style="color:var(--green);margin-left:6px"></span>`;
   document.querySelector('#btn-live .nb-label').textContent = i18n('liveLogs');
+  document.querySelector('#btn-system .nb-label').textContent = i18n('system');
 
   // Main header (if on live view)
   if (S.view === 'live') {
     document.getElementById('mh-title').textContent = i18n('liveLogs');
+  } else if (S.view === 'system') {
+    document.getElementById('mh-title').textContent = i18n('system');
   }
 
   // Search
@@ -1405,6 +1515,7 @@ function renderSessions() {
 function switchView(id) {
   if (isMobile()) closeSidebar();
   closeES();
+  if (S.systemTimer) { clearInterval(S.systemTimer); S.systemTimer = null; }
   S.view = id;
   S.historyDone = false;
   clearStream();
@@ -1423,6 +1534,18 @@ function switchView(id) {
     if (delBtn) delBtn.remove();
     S.liveLogs = [];
     startLive();
+  } else if (id === 'system') {
+    document.getElementById('btn-system').classList.add('active');
+    document.getElementById('mh-title').textContent = i18n('system');
+    document.getElementById('mh-sub').textContent   = 'openclaw system overview';
+    document.getElementById('filters').style.display = 'none';
+    document.getElementById('search-box').style.display = 'none';
+    document.getElementById('sess-summary').style.display = 'none';
+    const delBtn = document.getElementById('ss-del');
+    if (delBtn) delBtn.remove();
+    setConn('connected');
+    loadSystem();
+    S.systemTimer = setInterval(loadSystem, 30000);
   } else {
     const card = document.querySelector(`[data-session="${id}"]`);
     if (card) card.classList.add('active');
@@ -1718,6 +1841,305 @@ function appendSessionBlock(data, isLive) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   SYSTEM VIEW
+   ═══════════════════════════════════════════════════════════ */
+async function loadSystem() {
+  const stream = document.getElementById('stream');
+  if (!S.systemData) {
+    stream.innerHTML = `<div class="empty"><div class="ei"></div><p>${i18n('sysLoading')}</p></div>`;
+  }
+  try {
+    const data = await fetch('/api/system').then(r => r.json());
+    S.systemData = data;
+    renderSystem(data);
+  } catch(e) {
+    console.error('system load:', e);
+    stream.innerHTML = `<div class="empty"><p>⚠ ${esc(e.message)}</p></div>`;
+  }
+}
+
+function renderSystem(data) {
+  const stream = document.getElementById('stream');
+  const now = new Date().toLocaleTimeString('en-US', {hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  let h = '';
+
+  // Toolbar
+  h += `<div class="sys-toolbar">`;
+  h += `<span class="sys-toolbar-left">${i18n('sysLastUpdate')}: ${now}</span>`;
+  h += `<button class="sys-refresh-btn" onclick="loadSystem()">↻ ${i18n('sysRefresh')}</button>`;
+  h += `</div>`;
+
+  h += `<div class="sys-grid">`;
+
+  // 1. Channel Health
+  h += sysCard('📡', i18n('sysChannelHealth'), renderChannelHealth(data.channel_health));
+
+  // 2. Diagnostics
+  h += sysCard('🩺', i18n('sysDiagnostics'), renderDiagnostics(data.diagnostics));
+
+  // 3. Presence
+  h += sysCard('💓', i18n('sysPresence'), renderPresence(data.presence));
+
+  // 4. Context Window
+  h += sysCard('📐', i18n('sysContextWindow'), renderContextWindow(data.context_window));
+
+  // 5. System Prompt Report
+  h += sysCard('📝', i18n('sysPromptReport'), renderPromptReport(data.system_prompt_report));
+
+  // 6. Skills Snapshot
+  h += sysCard('🧩', i18n('sysSkillsSnapshot'), renderSkillsSnapshot(data.skills_snapshot));
+
+  // 7. Compaction History
+  h += sysCard('📦', i18n('sysCompaction'), renderCompaction(data.compaction_history));
+
+  // 8. Devices
+  h += sysCard('📱', i18n('sysDevices'), renderDevices(data.devices));
+
+  // 9. Cron Jobs
+  h += sysCard('⏰', i18n('sysCronJobs'), renderCronJobs(data.cron_jobs));
+
+  // 10. Update Check
+  h += sysCard('🔄', i18n('sysUpdateCheck'), renderUpdateCheck(data.update_check));
+
+  // 11. Exec Approvals
+  h += sysCard('🔐', i18n('sysExecApprovals'), renderExecApprovals(data.exec_approvals));
+
+  h += `</div>`; // .sys-grid
+
+  stream.innerHTML = h;
+}
+
+function sysCard(icon, title, bodyHtml) {
+  return `<div class="sys-card">
+    <div class="sys-card-hdr"><span class="sys-icon">${icon}</span>${esc(title)}</div>
+    <div class="sys-card-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function renderCliResult(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  if (data.error) return `<span class="sys-badge-err">${esc(data.error)}</span>`;
+  if (data.raw) return `<div class="sys-pre">${esc(data.raw)}</div>`;
+  return `<div class="sys-pre">${esc(JSON.stringify(data, null, 2))}</div>`;
+}
+
+function renderChannelHealth(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  if (data.error) return `<span class="sys-badge-err">${esc(data.error)}</span>`;
+  // If it's a parsed JSON object with channels, render nicely
+  if (data.channels && Array.isArray(data.channels)) {
+    return data.channels.map(ch => {
+      const name = ch.name || ch.channel || 'unknown';
+      const st = (ch.status || '').toLowerCase();
+      const badge = st === 'ok' || st === 'connected' || st === 'online'
+        ? `<span class="sys-badge-ok">${esc(ch.status)}</span>`
+        : st.includes('error') || st === 'offline'
+        ? `<span class="sys-badge-err">${esc(ch.status)}</span>`
+        : `<span class="sys-badge-warn">${esc(ch.status || '—')}</span>`;
+      return `<div class="sys-kv"><span class="sys-kv-key">${esc(name)}</span><span class="sys-kv-val">${badge}</span></div>`;
+    }).join('');
+  }
+  // If raw JSON/text
+  if (data.raw) return `<div class="sys-pre">${esc(data.raw)}</div>`;
+  // Generic JSON
+  return renderKvFromObj(data);
+}
+
+function renderDiagnostics(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  if (data.error) return `<span class="sys-badge-err">${esc(data.error)}</span>`;
+  if (data.raw) {
+    // Parse diagnostic text: lines with ✓ or ✕ or PASS/FAIL
+    const lines = data.raw.split('\n').filter(l => l.trim());
+    if (lines.length > 0) {
+      return lines.map(l => {
+        const isPass = /✓|pass|ok/i.test(l);
+        const isFail = /✕|✗|fail|error/i.test(l);
+        const badge = isPass ? '<span class="sys-badge-ok">PASS</span>'
+                    : isFail ? '<span class="sys-badge-err">FAIL</span>'
+                    : '';
+        return `<div class="sys-kv"><span class="sys-kv-key" style="flex:1">${esc(l.trim())}</span><span class="sys-kv-val">${badge}</span></div>`;
+      }).join('');
+    }
+  }
+  return renderKvFromObj(data);
+}
+
+function renderPresence(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  if (data.error) return `<span class="sys-badge-err">${esc(data.error)}</span>`;
+  if (Array.isArray(data)) {
+    if (data.length === 0) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+    return data.map(p => {
+      let h = '';
+      const keys = ['host','hostname','ip','mode','status','timestamp','uptime'];
+      keys.forEach(k => { if (p[k] !== undefined) h += `<div class="sys-kv"><span class="sys-kv-key">${k}</span><span class="sys-kv-val">${esc(String(p[k]))}</span></div>`; });
+      // any remaining keys
+      Object.keys(p).forEach(k => { if (!keys.includes(k)) h += `<div class="sys-kv"><span class="sys-kv-key">${esc(k)}</span><span class="sys-kv-val">${esc(String(p[k]))}</span></div>`; });
+      return h;
+    }).join('<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">');
+  }
+  if (data.raw) return `<div class="sys-pre">${esc(data.raw)}</div>`;
+  return renderKvFromObj(data);
+}
+
+function renderContextWindow(data) {
+  if (!data || !Array.isArray(data) || data.length === 0) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  return data.map(c => {
+    const pct = c.percent != null ? c.percent : 0;
+    const cls = pct > 90 ? 'err' : pct > 70 ? 'warn' : 'ok';
+    const sid = (c.sessionId || '').substring(0,8) + '…';
+    return `<div style="margin-bottom:8px">
+      <div class="sys-kv" style="border:none"><span class="sys-kv-key">${sid}</span><span class="sys-kv-val">${pct != null ? pct + '%' : '—'}</span></div>
+      <div class="sys-bar"><div class="sys-bar-fill ${cls}" style="width:${pct||0}%"></div></div>
+      <div style="font-size:10px;color:var(--t3)">${fmtTokens(c.contextTokens||0)} / ${fmtTokens(c.totalTokens||0)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPromptReport(data) {
+  if (!data || !Array.isArray(data) || data.length === 0) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  return data.map(r => {
+    const sid = (r.sessionId || '').substring(0,8) + '…';
+    const report = r.report;
+    if (typeof report === 'string') return `<div><strong>${sid}</strong><div class="sys-pre">${esc(report)}</div></div>`;
+    if (typeof report === 'object') {
+      let h = `<div style="margin-bottom:6px"><strong style="color:var(--t0)">${sid}</strong></div>`;
+      h += renderKvFromObj(report);
+      return h;
+    }
+    return '';
+  }).join('<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">');
+}
+
+function renderSkillsSnapshot(data) {
+  if (!data || !Array.isArray(data) || data.length === 0) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  // Collect skills from all sessions
+  let h = '';
+  data.forEach(entry => {
+    const snap = entry.snapshot;
+    if (!snap) return;
+    // snapshot may contain a 'prompt' with skill info, or be an object
+    if (typeof snap === 'object' && snap.prompt) {
+      // Extract skill names from the prompt text
+      const matches = [...snap.prompt.matchAll(/<name>([^<]+)<\/name>/g)];
+      if (matches.length > 0) {
+        h += `<div style="display:flex;flex-wrap:wrap;gap:2px">`;
+        matches.forEach(m => { h += `<span class="sys-tag">${esc(m[1])}</span>`; });
+        h += `</div>`;
+      } else {
+        h += `<div class="sys-pre">${esc(snap.prompt.substring(0,500))}</div>`;
+      }
+    } else if (Array.isArray(snap)) {
+      h += `<div style="display:flex;flex-wrap:wrap;gap:2px">`;
+      snap.forEach(s => { h += `<span class="sys-tag">${esc(typeof s === 'string' ? s : s.name || JSON.stringify(s))}</span>`; });
+      h += `</div>`;
+    } else {
+      h += renderKvFromObj(snap);
+    }
+  });
+  return h || `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+}
+
+function renderCompaction(data) {
+  if (!data || !Array.isArray(data) || data.length === 0) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  return data.map(c => {
+    const sid = (c.sessionId || '').substring(0,8) + '…';
+    const cnt = c.compactionCount || 0;
+    return `<div class="sys-kv"><span class="sys-kv-key">${sid}</span><span class="sys-kv-val">${cnt} ${i18n('sysCompactions')}</span></div>`;
+  }).join('');
+}
+
+function renderDevices(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  let h = '';
+  const paired = data.paired;
+  const pending = data.pending;
+
+  if (paired && typeof paired === 'object') {
+    const devs = Object.values(paired);
+    if (devs.length > 0) {
+      h += `<div style="font-size:10px;font-weight:600;color:var(--t2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">${i18n('sysPaired')} (${devs.length})</div>`;
+      devs.forEach(d => {
+        h += `<div style="margin-bottom:6px;padding:6px 0;border-bottom:1px solid var(--border)">`;
+        if (d.platform) h += `<div class="sys-kv"><span class="sys-kv-key">Platform</span><span class="sys-kv-val">${esc(d.platform)}</span></div>`;
+        if (d.clientMode) h += `<div class="sys-kv"><span class="sys-kv-key">Mode</span><span class="sys-kv-val">${esc(d.clientMode)}</span></div>`;
+        if (d.role) h += `<div class="sys-kv"><span class="sys-kv-key">Role</span><span class="sys-kv-val">${esc(d.role)}</span></div>`;
+        if (d.tokens) {
+          const tok = Object.values(d.tokens)[0];
+          if (tok && tok.lastUsedAtMs) {
+            h += `<div class="sys-kv"><span class="sys-kv-key">Last used</span><span class="sys-kv-val">${new Date(tok.lastUsedAtMs).toLocaleString()}</span></div>`;
+          }
+        }
+        h += `</div>`;
+      });
+    } else {
+      h += `<div style="font-size:10px;color:var(--t3)">${i18n('sysPaired')}: 0</div>`;
+    }
+  }
+
+  if (pending && typeof pending === 'object') {
+    const pkeys = Object.keys(pending);
+    if (pkeys.length > 0) {
+      h += `<div style="font-size:10px;font-weight:600;color:var(--orange);margin:6px 0 4px;text-transform:uppercase;letter-spacing:.5px">${i18n('sysPending')} (${pkeys.length})</div>`;
+      pkeys.forEach(k => {
+        h += `<div class="sys-kv"><span class="sys-kv-key">${esc(k.substring(0,12))}…</span><span class="sys-badge-warn">${i18n('sysPending')}</span></div>`;
+      });
+    }
+  }
+
+  return h || `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+}
+
+function renderCronJobs(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  const jobs = data.jobs;
+  if (!jobs || !Array.isArray(jobs) || jobs.length === 0) return `<span class="sys-empty">${i18n('sysNoJobs')}</span>`;
+  return jobs.map(j => {
+    let h = '';
+    Object.keys(j).forEach(k => {
+      h += `<div class="sys-kv"><span class="sys-kv-key">${esc(k)}</span><span class="sys-kv-val">${esc(String(j[k]))}</span></div>`;
+    });
+    return h;
+  }).join('<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">');
+}
+
+function renderUpdateCheck(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  let h = '';
+  if (data.lastNotifiedVersion) h += `<div class="sys-kv"><span class="sys-kv-key">${i18n('sysVersion')}</span><span class="sys-kv-val">${esc(data.lastNotifiedVersion)}</span></div>`;
+  if (data.lastNotifiedTag) h += `<div class="sys-kv"><span class="sys-kv-key">Tag</span><span class="sys-kv-val"><span class="sys-tag">${esc(data.lastNotifiedTag)}</span></span></div>`;
+  if (data.lastCheckedAt) h += `<div class="sys-kv"><span class="sys-kv-key">${i18n('sysLastChecked')}</span><span class="sys-kv-val">${new Date(data.lastCheckedAt).toLocaleString()}</span></div>`;
+  return h || `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+}
+
+function renderExecApprovals(data) {
+  if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+  let h = '';
+  if (data.version !== undefined) h += `<div class="sys-kv"><span class="sys-kv-key">${i18n('sysVersion')}</span><span class="sys-kv-val">${data.version}</span></div>`;
+  if (data.socket) {
+    h += `<div class="sys-kv"><span class="sys-kv-key">${i18n('sysSocket')}</span><span class="sys-kv-val" style="font-size:10px">${esc(data.socket.path || '—')}</span></div>`;
+  }
+  const agentCount = data.agents ? Object.keys(data.agents).length : 0;
+  const defaultCount = data.defaults ? Object.keys(data.defaults).length : 0;
+  h += `<div class="sys-kv"><span class="sys-kv-key">Agents</span><span class="sys-kv-val">${agentCount}</span></div>`;
+  h += `<div class="sys-kv"><span class="sys-kv-key">Defaults</span><span class="sys-kv-val">${defaultCount}</span></div>`;
+  return h;
+}
+
+function renderKvFromObj(obj) {
+  if (!obj || typeof obj !== 'object') return `<span class="sys-empty">—</span>`;
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return `<span class="sys-empty">—</span>`;
+  return keys.map(k => {
+    let v = obj[k];
+    if (typeof v === 'object' && v !== null) v = JSON.stringify(v);
+    return `<div class="sys-kv"><span class="sys-kv-key">${esc(k)}</span><span class="sys-kv-val">${esc(String(v))}</span></div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
    UTILITIES
    ═══════════════════════════════════════════════════════════ */
 function closeES() { if (S.es) { S.es.close(); S.es = null; } }
@@ -1941,6 +2363,7 @@ function hlJson(s) {
 /* ── bind UI events ───────────────────────────────────── */
 function bindAll() {
   document.getElementById('btn-live').onclick = () => switchView('live');
+  document.getElementById('btn-system').onclick = () => switchView('system');
 
   // mobile sidebar toggle
   document.getElementById('menu-btn').onclick = () => {

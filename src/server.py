@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import concurrent.futures
 import glob as globmod
 import hashlib
 import http.server
@@ -62,6 +63,147 @@ if ARGS.version:
 SESSION_DIR = os.path.expanduser("~/.openclaw/agents/main/sessions")
 LOG_DIR     = "/tmp/openclaw"
 TODAY_LOG   = os.path.join(LOG_DIR, f"openclaw-{datetime.now().strftime('%Y-%m-%d')}.log")
+
+# ── System monitoring paths ─────────────────────────────────
+OC_ROOT         = os.path.expanduser("~/.openclaw")
+SESSIONS_JSON   = os.path.join(SESSION_DIR, "sessions.json")
+DEVICES_PAIRED  = os.path.join(OC_ROOT, "devices", "paired.json")
+DEVICES_PENDING = os.path.join(OC_ROOT, "devices", "pending.json")
+CRON_JOBS       = os.path.join(OC_ROOT, "cron", "jobs.json")
+UPDATE_CHECK    = os.path.join(OC_ROOT, "update-check.json")
+EXEC_APPROVALS  = os.path.join(OC_ROOT, "exec-approvals.json")
+
+# ── Resolve openclaw binary + env ────────────────────────────
+def _find_openclaw():
+    """Find openclaw binary and build an env dict with node on PATH.
+    systemd services have a minimal PATH that excludes nvm/npm dirs."""
+    import shutil
+    oc_bin = shutil.which('openclaw')
+    if oc_bin:
+        return oc_bin, None  # already on PATH, no custom env needed
+
+    nvm_base = os.path.expanduser('~/.nvm/versions/node')
+    if os.path.isdir(nvm_base):
+        for entry in sorted(os.listdir(nvm_base), reverse=True):
+            bin_dir = os.path.join(nvm_base, entry, 'bin')
+            p = os.path.join(bin_dir, 'openclaw')
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                # Build env with this bin_dir prepended to PATH
+                env = os.environ.copy()
+                env['PATH'] = bin_dir + ':' + env.get('PATH', '/usr/bin:/bin')
+                return p, env
+
+    for d in ['/usr/local/bin', '/usr/local/lib/node_modules/.bin']:
+        p = os.path.join(d, 'openclaw')
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p, None
+
+    return 'openclaw', None
+
+OC_BIN, OC_ENV = _find_openclaw()
+
+# ── Background CLI cache ─────────────────────────────────
+# CLI commands are slow (~10s each due to Node startup).
+# Run them in a background thread and cache the results.
+_cli_cache = {
+    'channel_health': None,
+    'presence': None,
+    'lastUpdated': None,
+}
+_cli_cache_lock = threading.Lock()
+_CLI_CACHE_INTERVAL = 120  # seconds between refreshes
+
+def _run_cli_cached(cmd, timeout=30):
+    """Run a CLI command, return parsed result."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=OC_ENV)
+        out = r.stdout.strip()
+        if r.returncode != 0:
+            return {'raw': out, 'stderr': r.stderr.strip(), 'exitCode': r.returncode}
+        # Try direct JSON parse first
+        try:
+            return json.loads(out)
+        except (json.JSONDecodeError, ValueError):
+            pass
+        # stdout may contain mixed text (e.g. Doctor warnings box art) before
+        # the actual JSON. Try to extract the first JSON object or array.
+        for start_char, end_char in (('{', '}'), ('[', ']')):
+            idx = out.find(start_char)
+            if idx >= 0:
+                # find matching end from the back
+                ridx = out.rfind(end_char)
+                if ridx > idx:
+                    try:
+                        return json.loads(out[idx:ridx + 1])
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+        return {'raw': out}
+    except subprocess.TimeoutExpired:
+        return {'error': 'timeout'}
+    except FileNotFoundError:
+        return {'error': 'openclaw not found'}
+    except OSError as e:
+        return {'error': str(e)}
+
+def _cli_cache_worker():
+    """Background thread: refresh CLI data periodically."""
+    while True:
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                f_channel  = pool.submit(_run_cli_cached, [OC_BIN, 'status', '--json'])
+                f_presence = pool.submit(_run_cli_cached, [OC_BIN, 'system', 'presence'])
+                ch = f_channel.result(timeout=60)
+                pr = f_presence.result(timeout=60)
+            with _cli_cache_lock:
+                _cli_cache['channel_health'] = ch
+                _cli_cache['presence'] = pr
+                _cli_cache['lastUpdated'] = time.time()
+        except Exception:
+            pass
+        time.sleep(_CLI_CACHE_INTERVAL)
+
+_cli_cache_thread = threading.Thread(target=_cli_cache_worker, daemon=True)
+_cli_cache_thread.start()
+
+def _file_diagnostics():
+    """Read-only diagnostics from files (replaces `openclaw doctor`)."""
+    issues = []
+    oc_root = os.path.expanduser('~/.openclaw')
+    # Check state directory permissions
+    try:
+        mode = oct(os.stat(oc_root).st_mode)[-3:]
+        if mode != '700':
+            issues.append(f'State directory permissions are {mode}, recommend 700')
+    except OSError:
+        issues.append('State directory not found')
+    # Check config file permissions
+    cfg = os.path.join(oc_root, 'openclaw.json')
+    try:
+        mode = oct(os.stat(cfg).st_mode)[-3:]
+        if mode not in ('600', '400'):
+            issues.append(f'Config file permissions are {mode}, recommend 600')
+    except OSError:
+        issues.append('Config file not found')
+    # Check credentials directory
+    creds_dir = os.path.join(oc_root, 'credentials')
+    if not os.path.isdir(creds_dir):
+        issues.append('OAuth credentials directory missing (~/.openclaw/credentials)')
+    # Check session transcripts
+    sessions_data = _read_json_file(SESSIONS_JSON)
+    missing = 0
+    total = 0
+    if isinstance(sessions_data, dict):
+        for key, s in sessions_data.items():
+            if not isinstance(s, dict):
+                continue
+            sid = s.get('sessionId', key)
+            total += 1
+            transcript = os.path.join(SESSION_DIR, f'{sid}.jsonl')
+            if not os.path.isfile(transcript):
+                missing += 1
+    if missing > 0:
+        issues.append(f'{missing}/{total} sessions are missing transcripts')
+    return {'issues': issues, 'issueCount': len(issues)}
 
 UUID_RE     = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)
 # Pattern for extracting timestamp from log lines (e.g., "2024-01-15 14:30:45" or "14:30:45.123")
@@ -267,6 +409,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         if   path == '/api/sessions':            return self._api_sessions()
         elif path == '/api/health':              return self._api_health()
+        elif path == '/api/system':              return self._api_system()
         elif path == '/api/logs/stream':         return self._api_log_stream()
         elif path.startswith('/api/session/') and path.endswith('/stream'):
             sid = path[len('/api/session/'):-len('/stream')]
@@ -376,8 +519,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         sessions = []
         # try CLI first
         try:
-            r = subprocess.run(['openclaw', 'sessions'],
-                               capture_output=True, text=True, timeout=5)
+            r = subprocess.run([OC_BIN, 'sessions'],
+                               capture_output=True, text=True, timeout=5, env=OC_ENV)
             if r.returncode == 0 and r.stdout.strip():
                 sessions = _parse_oc_sessions(r.stdout)
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
@@ -397,12 +540,94 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             'today_log_exists':   os.path.isfile(TODAY_LOG),
         }
         try:
-            r = subprocess.run(['openclaw', 'health'],
-                               capture_output=True, text=True, timeout=5)
+            r = subprocess.run([OC_BIN, 'health'],
+                               capture_output=True, text=True, timeout=5, env=OC_ENV)
             result['openclaw_available'] = (r.returncode == 0)
             result['output'] = r.stdout.strip()
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
             pass
+        _json_resp(self, result)
+
+    # ── GET /api/system ────────────────────────────────────
+    def _api_system(self):
+        result = {}
+
+        # --- CLI data from background cache (instant) ---
+        with _cli_cache_lock:
+            result['channel_health'] = _cli_cache['channel_health'] or {'error': 'loading'}
+            result['presence'] = _cli_cache['presence'] or {'error': 'loading'}
+            last = _cli_cache['lastUpdated']
+            result['cli_lastUpdated'] = last
+            result['cli_age'] = round(time.time() - last, 1) if last else None
+
+        # --- File-based diagnostics (replaces `openclaw doctor`) ---
+        result['diagnostics'] = _file_diagnostics()
+
+        # --- File-based data ---
+        sessions_data = _read_json_file(SESSIONS_JSON)
+
+        # 4. Context Window
+        ctx = []
+        if isinstance(sessions_data, dict):
+            for key, s in sessions_data.items():
+                if not isinstance(s, dict):
+                    continue
+                sid = s.get('sessionId', key)
+                ct = s.get('contextTokens')
+                tt = s.get('totalTokens')
+                if ct is not None or tt is not None:
+                    # contextTokens = window size, totalTokens = used tokens
+                    pct = round(tt / ct * 100, 1) if ct and tt and ct > 0 else None
+                    ctx.append({'sessionId': sid, 'contextTokens': ct, 'totalTokens': tt, 'percent': pct})
+        result['context_window'] = ctx
+
+        # 5. System Prompt Report
+        spr = []
+        if isinstance(sessions_data, dict):
+            for key, s in sessions_data.items():
+                if not isinstance(s, dict):
+                    continue
+                report = s.get('systemPromptReport')
+                if report:
+                    spr.append({'sessionId': s.get('sessionId', key), 'report': report})
+        result['system_prompt_report'] = spr
+
+        # 6. Skills Snapshot
+        skills = []
+        if isinstance(sessions_data, dict):
+            for key, s in sessions_data.items():
+                if not isinstance(s, dict):
+                    continue
+                snap = s.get('skillsSnapshot')
+                if snap:
+                    skills.append({'sessionId': s.get('sessionId', key), 'snapshot': snap})
+        result['skills_snapshot'] = skills
+
+        # 7. Compaction History
+        compaction = []
+        if isinstance(sessions_data, dict):
+            for key, s in sessions_data.items():
+                if not isinstance(s, dict):
+                    continue
+                cc = s.get('compactionCount')
+                if cc is not None:
+                    compaction.append({'sessionId': s.get('sessionId', key), 'compactionCount': cc})
+        result['compaction_history'] = compaction
+
+        # 8. Devices
+        paired = _read_json_file(DEVICES_PAIRED)
+        pending = _read_json_file(DEVICES_PENDING)
+        result['devices'] = {'paired': paired, 'pending': pending}
+
+        # 9. Cron Jobs
+        result['cron_jobs'] = _read_json_file(CRON_JOBS)
+
+        # 10. Update Check
+        result['update_check'] = _read_json_file(UPDATE_CHECK)
+
+        # 11. Exec Approvals
+        result['exec_approvals'] = _read_json_file(EXEC_APPROVALS)
+
         _json_resp(self, result)
 
     # ── SSE /api/logs/stream ────────────────────────────────
@@ -496,6 +721,16 @@ def _json_resp(handler, obj):
     handler.send_header('Content-Length', str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
+
+
+# ── Read JSON file helper ────────────────────────────────────
+def _read_json_file(path):
+    """Safely read and parse a JSON file, return None on error."""
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
 
 
 # ── Tail log file directly (no gateway RPC) ─────────────────
