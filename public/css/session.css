@@ -1,0 +1,32 @@
+/* ═══════════════════════════════════════════════════════════
+   SESSION SUMMARY BAR (shown when viewing a session)
+   ═══════════════════════════════════════════════════════════ */
+.sess-summary{
+  display:flex;flex-direction:column;gap:0;
+  padding:0;background:var(--bg-2);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.ss-row-top{
+  display:flex;gap:20px;flex-wrap:wrap;align-items:center;
+  padding:10px 18px 6px;
+}
+.ss-item{display:flex;flex-direction:column;gap:1px}
+.ss-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--t3);font-weight:600}
+.ss-val{font-size:11px;color:var(--t0);font-weight:600;font-variant-numeric:tabular-nums}
+.ss-models{
+  display:flex;gap:8px;flex-wrap:wrap;
+  padding:0 18px 10px;
+}
+.ss-model-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px;border-radius:5px;
+  background:var(--bg-3);border:1px solid var(--border);
+  font-size:10.5px;color:var(--t1);
+}
+.ss-model-tag.current{border-color:rgba(88,166,255,.4);background:rgba(88,166,255,.08)}
+.ss-model-name{font-weight:600;color:var(--t0)}
+.ss-model-detail{color:var(--t3);font-variant-numeric:tabular-nums}
+
+/* session summary toggle (hidden on desktop) */
+.ss-toggle{display:none}
+.ss-body{display:contents}

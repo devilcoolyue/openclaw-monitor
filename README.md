@@ -13,7 +13,8 @@ A real-time web dashboard for monitoring [OpenClaw](https://github.com/anthropic
 - **Tailscale Support** — Optionally bind to Tailscale interface for private network access
 - **Dark / Light Theme** — Toggle between dark and light mode
 - **Auto Refresh** — Session list auto-refreshes; log stream stays connected via SSE
-- **Session Cleanup** — Delete old sessions directly from the dashboard
+- **System Dashboard** — Real-time CPU, memory, disk, and network monitoring
+- **Bilingual UI** — English / Chinese toggle with full localization
 - **Zero Dependencies** — Pure Python backend + vanilla HTML/CSS/JS frontend, no npm or pip install needed
 
 ## Screenshot
@@ -102,14 +103,23 @@ systemctl --user enable openclaw-monitor
 systemctl --user disable openclaw-monitor
 ```
 
-Or use the helper scripts:
+Or use the global CLI command (installed via `install.sh`):
 
 ```bash
-# Start (delegates to systemctl if service is installed)
-./scripts/start.sh
+openclaw-monitor start
+openclaw-monitor stop
+openclaw-monitor restart
+openclaw-monitor status
+openclaw-monitor logs
+```
 
-# Health check
-./scripts/check.sh
+Or use the helper scripts directly:
+
+```bash
+./scripts/start.sh       # Start (delegates to systemctl if service is installed)
+./scripts/check.sh       # Health check with auto-restart
+./scripts/update.sh      # Git pull + service restart
+./scripts/uninstall.sh   # Clean removal
 ```
 
 ### Tailscale Binding
@@ -132,14 +142,55 @@ This makes the dashboard accessible only through your Tailscale network. Require
 
 ```
 openclaw-monitor/
-├── src/
-│   └── server.py          # Python HTTP server with REST API + SSE endpoints + auth
+├── src/                            # Backend — 11 Python modules
+│   ├── server.py                   # Entry point: _Server class, BIND_HOST, __main__
+│   ├── config.py                   # Configuration, constants, paths, CLI args
+│   ├── auth.py                     # Authentication: password verify, session cookies, login page
+│   ├── handler.py                  # HTTP handler: do_GET/POST, all _api_* methods (read-only)
+│   ├── sse.py                      # SSE utilities: _begin_sse(), _send_sse(), _json_resp()
+│   ├── logs.py                     # Log resolution, tailing, parsing, classification
+│   ├── sessions.py                 # Session file scanning and info extraction
+│   ├── jsonl.py                    # JSONL line parser
+│   ├── cli_cache.py                # Background CLI cache worker
+│   ├── diagnostics.py              # System file diagnostics
+│   └── tailscale.py                # Tailscale IP detection
 ├── public/
-│   └── index.html         # Single-page dashboard (HTML + CSS + JS)
+│   ├── index.html                  # HTML structure only (~200 lines)
+│   ├── css/                        # 9 CSS files
+│   │   ├── base.css                # Variables, reset, scrollbar, icons
+│   │   ├── sidebar.css             # Sidebar, navigation, session cards
+│   │   ├── boot.css                # Boot detection overlay
+│   │   ├── toast.css               # Toast notifications
+│   │   ├── main.css                # Main content area, toolbar, filters
+│   │   ├── session.css             # Session summary bar
+│   │   ├── stream.css              # Log rows, session blocks, markdown
+│   │   ├── system.css              # System dashboard cards
+│   │   └── mobile.css              # Responsive overrides (loads last)
+│   └── js/                         # 16 ES Module files
+│       ├── main.js                 # Entry point: init, bindAll, bootCheck
+│       ├── state.js                # Global state object S
+│       ├── i18n.js                 # Bilingual dictionary, i18n()
+│       ├── utils.js                # esc(), fmtTime(), fmtTokens(), renderMd()
+│       ├── theme.js                # Dark/light theme toggle
+│       ├── lang.js                 # Language toggle and UI text update
+│       ├── boot.js                 # Boot detection sequence
+│       ├── connection.js           # SSE connection management, health polling
+│       ├── sse.js                  # startLive(), startSession()
+│       ├── sessions.js             # Session list, switchView()
+│       ├── filter.js               # Log filtering and search
+│       ├── toast.js                # Toast notification display
+│       ├── mobile.js               # Mobile sidebar toggle
+│       ├── render-log.js           # Live log row rendering
+│       ├── render-session.js       # Session detail block rendering
+│       └── render-system.js        # System dashboard rendering
 ├── scripts/
-│   ├── install.sh         # Installation script (password setup + systemd service)
-│   ├── start.sh           # Startup helper (delegates to systemctl)
-│   └── check.sh           # Health check script (delegates to systemctl)
+│   ├── install.sh                  # Interactive install + password setup + systemd
+│   ├── start.sh                    # Startup helper (systemd or direct)
+│   ├── check.sh                    # Health check with auto-restart
+│   ├── update.sh                   # Git pull + service restart
+│   └── uninstall.sh                # Clean removal
+├── bin/
+│   └── openclaw-monitor            # Global CLI wrapper
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -153,11 +204,12 @@ openclaw-monitor/
 | `/api/health` | GET | Check OpenClaw availability and environment |
 | `/api/logs/stream` | GET (SSE) | Real-time log stream |
 | `/api/session/<id>/stream` | GET (SSE) | Session event stream (history + live tail) |
-| `/api/session/<id>` | DELETE | Delete a session file |
+| `/api/system` | GET | System diagnostics (CPU, memory, disk, network) |
+| `/api/version` | GET | Server version |
 | `/api/login` | POST | Authenticate with password |
 | `/api/logout` | GET | Clear session and log out |
 
-All endpoints except `/api/login` and `/api/logout` require authentication when `.auth` is present.
+All endpoints except `/api/login`, `/api/logout`, and `/api/version` require authentication when `.auth` is present.
 
 ### Security
 
@@ -174,9 +226,10 @@ All endpoints except `/api/login` and `/api/logout` require authentication when 
 2. Calls `openclaw` CLI for session listing; falls back to direct file scanning when CLI is unavailable
 3. Streams logs by directly tailing `/tmp/openclaw/openclaw-YYYY-MM-DD.log` (bypasses gateway RPC for minimal resource usage)
 4. Enforces concurrency limits (max 2 SSE streams) and rate limiting (50 lines/sec) to protect low-memory servers
-5. Serves a single-page dashboard via built-in HTTP server
+5. Serves a modular single-page dashboard via built-in HTTP server (native ES Modules, no build step)
 6. Uses Server-Sent Events (SSE) for real-time updates
-7. Managed as a systemd user service for reliable startup and auto-restart
+7. Background thread refreshes `openclaw status --json` every 120s for CLI cache
+8. Managed as a systemd user service for reliable startup and auto-restart
 
 ## License
 

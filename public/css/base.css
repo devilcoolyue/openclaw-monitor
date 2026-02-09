@@ -1,0 +1,56 @@
+/* ═══════════════════════════════════════════════════════════
+   Reset & Variables
+   ═══════════════════════════════════════════════════════════ */
+/* Dark theme (default) */
+:root {
+  --bg-0:#0a0e13; --bg-1:#111519; --bg-2:#161b22; --bg-3:#1c2330;
+  --border:#1e2530; --border-hi:#2d3644;
+  --scroll-thumb:#3a4555; --scroll-thumb-hi:#4f5d73;
+  --t0:#e6edf3; --t1:#c9d1d9; --t2:#8b949e; --t3:#6e7681;
+  --accent:#58a6ff; --green:#3fb950; --green2:#56d364;
+  --orange:#ffa657; --purple:#bc8cff; --red:#ff7b72; --yellow:#e3b341;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-0:#f6f8fa; --bg-1:#ffffff; --bg-2:#f0f3f6; --bg-3:#e8ebef;
+  --border:#d0d7de; --border-hi:#afb8c1;
+  --scroll-thumb:#afb8c1; --scroll-thumb-hi:#8c959f;
+  --t0:#1f2328; --t1:#31363f; --t2:#57606a; --t3:#6e7781;
+  --accent:#0969da; --green:#1a7f37; --green2:#2da44e;
+  --orange:#bc4c00; --purple:#8250df; --red:#cf222e; --yellow:#9a6700;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'SF Mono','Fira Code','JetBrains Mono','Consolas','Courier New',monospace;
+  background:var(--bg-0);color:var(--t1);font-size:13px;line-height:1.5;
+  display:flex;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+a{color:inherit;text-decoration:none}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hi)}
+
+/* SVG Icons */
+.icon{display:inline-flex;align-items:center;justify-content:center;width:1em;height:1em;vertical-align:middle;flex-shrink:0}
+.icon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-sm{font-size:14px}
+.icon-md{font-size:16px}
+.icon-lg{font-size:18px}
+
+/* Button refinements */
+.theme-btn,.lang-btn,.logout-btn{transition:all .2s cubic-bezier(.2,.9,.3,1)}
+.theme-btn:hover{transform:scale(1.08)}
+.lang-btn:hover{transform:scale(1.08)}
+.logout-btn:hover{transform:scale(1.08)}
+.copy-btn{transition:all .2s cubic-bezier(.2,.9,.3,1)}
+.copy-btn:hover{transform:scale(1.1)}
+.nav-btn{transition:background .2s,border-color .2s,color .2s,transform .15s}
+.nav-btn:active{transform:scale(.98)}
+.s-card{transition:background .2s,border-color .2s,transform .15s}
+.s-card:active{transform:scale(.99)}
