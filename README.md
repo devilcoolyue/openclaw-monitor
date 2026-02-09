@@ -1,109 +1,130 @@
-# openclaw-monitor
+<div align="center">
+  <h1>openclaw-monitor</h1>
+  <p>面向 <a href="https://github.com/anthropics/openclaw">OpenClaw</a> 的实时监控面板，用于查看会话、日志与 Token 使用情况。</p>
+  <p><a href="README.en.md">English README</a></p>
+  <img src="image/logos/openclaw-monitor.png" alt="OpenClaw Monitor Logo" width="520" />
+</div>
 
-A real-time web dashboard for monitoring [OpenClaw](https://github.com/anthropics/openclaw) sessions, logs, and token usage.
+## 功能亮点
 
-## Features
+- **会话管理** — 查看所有活跃/空闲会话、模型信息、Token 使用量与费用估算
+- **实时日志流** — 直接 tail 文件并通过 SSE 推送，无网关 RPC 额外开销
+- **会话详情** — 查看单个会话的消息、思考块、工具调用与工具结果
+- **Token 与费用** — 按会话/模型统计 Token 使用并估算成本
+- **并发与限流** — 最多 2 路并发流，50 行/秒限流保护服务器
+- **登录鉴权** — 密码保护访问，安全会话 Cookie
+- **Tailscale 支持** — 可绑定 Tailscale 网卡，私网访问
+- **深色/浅色主题** — 一键切换主题
+- **自动刷新** — 会话列表自动刷新，日志流 SSE 保持连接
+- **系统监控** — 实时 CPU、内存、磁盘、网络指标
+- **双语界面** — 中英文切换与完整本地化
+- **零依赖** — 纯 Python 后端 + 原生 HTML/CSS/JS 前端，无需 npm 或 pip
 
-- **Session Management** — View all active/idle sessions with model info, token usage, and cost breakdown
-- **Real-time Log Streaming** — Direct file tail with SSE push, no gateway RPC overhead
-- **Session Detail View** — Inspect individual session messages including thinking blocks, tool calls, and tool results
-- **Token & Cost Tracking** — Per-session and per-model token usage with cost estimation
-- **Concurrency & Rate Limiting** — Max 2 concurrent log streams, 50 lines/sec throttle to prevent server overload
-- **Login Authentication** — Password-protected access with secure session cookies
-- **Tailscale Support** — Optionally bind to Tailscale interface for private network access
-- **Dark / Light Theme** — Toggle between dark and light mode
-- **Auto Refresh** — Session list auto-refreshes; log stream stays connected via SSE
-- **System Dashboard** — Real-time CPU, memory, disk, and network monitoring
-- **Bilingual UI** — English / Chinese toggle with full localization
-- **Zero Dependencies** — Pure Python backend + vanilla HTML/CSS/JS frontend, no npm or pip install needed
+## 功能截图
 
-## Screenshot
+- **实时日志流**
 
-<!-- TODO: add screenshot -->
+  ![实时日志流](image/screenshots/realtime_log.jpg)
 
-## Requirements
+- **会话详情**
+
+  ![会话详情](image/screenshots/realtime_session.jpg)
+
+- **会话流回放**
+
+  ![会话流回放](image/gifs/realtime_session_stream.gif)
+
+- **系统监控面板**
+
+  ![系统监控面板](image/screenshots/system.jpg)
+
+- **网关告警提示**
+
+  ![网关告警提示](image/screenshots/gateway_outline_notify.jpg)
+
+## 运行要求
 
 - Python 3.10+
-- OpenClaw CLI installed and accessible in `$PATH`
-- systemd (for user service management)
-- (Optional) Tailscale for private network binding
+- OpenClaw CLI 已安装并可在 `$PATH` 中访问
+- systemd（用于用户级服务管理）
+- （可选）Tailscale，用于私网绑定
 
-## Quick Start
+## 快速开始
 
-One-liner install on a fresh server:
+在新服务器上一行安装：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
 ```
 
-This will clone the repo to `~/openclaw-monitor`, prompt for an admin password, and install a systemd user service.
+该脚本会将仓库克隆到 `~/openclaw-monitor`，提示设置管理员密码，并安装 systemd 用户服务。
 
-To install to a custom directory:
+自定义安装目录：
 
 ```bash
 OPENCLAW_MONITOR_DIR=~/my-monitor curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
 ```
 
-To use a custom port (default: 18765):
+自定义端口（默认：18765）：
 
 ```bash
 OPENCLAW_MONITOR_PORT=9999 curl -fsSL https://raw.githubusercontent.com/devilcoolyue/openclaw-monitor/main/scripts/install.sh | bash
 ```
 
-Then start the service:
+然后启动服务：
 
 ```bash
 systemctl --user start openclaw-monitor
 ```
 
-Open `http://<server-ip>:18765` in your browser.
+浏览器打开 `http://<server-ip>:18765`。
 
-## Manual Installation
+## 手动安装
 
 ```bash
 git clone https://github.com/devilcoolyue/openclaw-monitor.git ~/openclaw-monitor
 cd ~/openclaw-monitor
 
-# Set admin password and install systemd service
+# 设置管理员密码并安装 systemd 服务
 ./scripts/install.sh
 
-# Start the service (default port: 18765)
+# 启动服务（默认端口：18765）
 systemctl --user start openclaw-monitor
 
-# Or run directly with a custom port
+# 或者使用自定义端口直接运行
 python3 src/server.py --port 9999
 ```
 
-If you skip installation or delete `.auth`, the dashboard runs without authentication (open access).
+如果跳过安装或删除 `.auth`，面板将不进行鉴权（公开访问）。
 
-## Usage
+## 使用
 
-### Service Management
+### 服务管理
 
 ```bash
-# Start
+# 启动
 systemctl --user start openclaw-monitor
 
-# Stop
+# 停止
 systemctl --user stop openclaw-monitor
 
-# Restart
+# 重启
 systemctl --user restart openclaw-monitor
 
-# Status & health check
+# 状态与健康检查
 systemctl --user status openclaw-monitor
 
-# View logs
+# 查看日志
 journalctl --user -u openclaw-monitor -f
 
-# Enable auto-start on login
+# 登录时自启动
 systemctl --user enable openclaw-monitor
 
-# Disable auto-start
+# 取消自启动
 systemctl --user disable openclaw-monitor
 ```
 
-Or use the global CLI command (installed via `install.sh`):
+或使用全局 CLI 命令（由 `install.sh` 安装）：
 
 ```bash
 openclaw-monitor start
@@ -113,32 +134,32 @@ openclaw-monitor status
 openclaw-monitor logs
 ```
 
-Or use the helper scripts directly:
+或直接使用脚本：
 
 ```bash
-./scripts/start.sh       # Start (delegates to systemctl if service is installed)
-./scripts/check.sh       # Health check with auto-restart
-./scripts/update.sh      # Git pull + service restart
-./scripts/uninstall.sh   # Clean removal
+./scripts/start.sh       # 启动（若已安装服务则委托 systemctl）
+./scripts/check.sh       # 健康检查并自动重启
+./scripts/update.sh      # 拉取更新并重启服务
+./scripts/uninstall.sh   # 清理卸载
 ```
 
-### Tailscale Binding
+### Tailscale 绑定
 
-Use the `--tailscale` flag during installation to bind the server to your Tailscale IP:
+安装时使用 `--tailscale` 参数绑定 Tailscale IP：
 
 ```bash
 ./scripts/install.sh --tailscale
 ```
 
-Or run directly:
+或直接运行：
 
 ```bash
 python3 src/server.py --port 18765 --tailscale
 ```
 
-This makes the dashboard accessible only through your Tailscale network. Requires Tailscale to be installed and running.
+此方式会让面板仅在 Tailscale 私网内可访问，需已安装并运行 Tailscale。
 
-## Architecture
+## 架构
 
 ```
 openclaw-monitor/
@@ -196,7 +217,7 @@ openclaw-monitor/
 └── README.md
 ```
 
-### API Endpoints
+### API 接口
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -209,27 +230,27 @@ openclaw-monitor/
 | `/api/login` | POST | Authenticate with password |
 | `/api/logout` | GET | Clear session and log out |
 
-All endpoints except `/api/login`, `/api/logout`, and `/api/version` require authentication when `.auth` is present.
+当 `.auth` 存在时，除 `/api/login`、`/api/logout` 与 `/api/version` 外均需要认证。
 
-### Security
+### 安全说明
 
-- Password stored as SHA-256 hash with random 32-byte salt
-- Session tokens: 64-char hex via `secrets.token_hex(32)`
-- Cookie flags: `HttpOnly`, `SameSite=Strict`
-- Session TTL: 7 days
-- Login page is self-contained (no dashboard data exposed)
-- Without `.auth` file, auth is disabled (backwards compatible)
+- 密码使用 SHA-256 哈希并带 32 字节随机盐
+- 会话 Token：`secrets.token_hex(32)` 生成 64 位十六进制
+- Cookie 标记：`HttpOnly`、`SameSite=Strict`
+- Session TTL：7 天
+- 登录页为独立页面（不暴露面板数据）
+- 不存在 `.auth` 时禁用鉴权（向后兼容）
 
-### How It Works
+### 工作原理
 
-1. Reads session data from `~/.openclaw/agents/main/sessions/*.jsonl`
-2. Calls `openclaw` CLI for session listing; falls back to direct file scanning when CLI is unavailable
-3. Streams logs by directly tailing `/tmp/openclaw/openclaw-YYYY-MM-DD.log` (bypasses gateway RPC for minimal resource usage)
-4. Enforces concurrency limits (max 2 SSE streams) and rate limiting (50 lines/sec) to protect low-memory servers
-5. Serves a modular single-page dashboard via built-in HTTP server (native ES Modules, no build step)
-6. Uses Server-Sent Events (SSE) for real-time updates
-7. Background thread refreshes `openclaw status --json` every 120s for CLI cache
-8. Managed as a systemd user service for reliable startup and auto-restart
+1. 从 `~/.openclaw/agents/main/sessions/*.jsonl` 读取会话数据
+2. 通过 `openclaw` CLI 获取会话列表；CLI 不可用时回退到直接扫描
+3. 直接 tail `/tmp/openclaw/openclaw-YYYY-MM-DD.log` 进行日志流式传输
+4. 并发限制（最多 2 路 SSE）与限流（50 行/秒）保护低内存服务器
+5. 内置 HTTP 服务提供模块化单页面板（原生 ES Modules，无构建步骤）
+6. 使用 SSE 实现实时更新
+7. 后台线程每 120 秒刷新 `openclaw status --json` 的 CLI 缓存
+8. 使用 systemd 用户服务管理，确保稳定启动与自动重启
 
 ## License
 
