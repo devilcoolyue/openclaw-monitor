@@ -1,6 +1,6 @@
 <div align="center">
   <h1>openclaw-monitor</h1>
-  <p>面向 <a href="https://github.com/anthropics/openclaw">OpenClaw</a> 的实时监控面板，用于查看会话、日志与 Token 使用情况。</p>
+  <p>面向 <a href="https://github.com/openclaw/openclaw">OpenClaw</a> 的实时监控面板，用于查看会话、日志与 Token 使用情况。</p>
   <p><a href="README.en.md">English README</a></p>
   <img src="image/logos/openclaw-monitor.png" alt="OpenClaw Monitor Logo" width="520" />
 </div>

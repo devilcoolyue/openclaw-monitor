@@ -1,6 +1,6 @@
 # openclaw-monitor
 
-A real-time web dashboard for monitoring [OpenClaw](https://github.com/anthropics/openclaw) sessions, logs, and token usage.
+A real-time web dashboard for monitoring [OpenClaw](https://github.com/openclaw/openclaw) sessions, logs, and token usage.
 
 中文版说明请查看：[README.md](README.md)
 
