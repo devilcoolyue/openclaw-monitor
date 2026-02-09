@@ -73,7 +73,10 @@ export const I18N = {
     sysLoading: 'Loading system data…',
     gatewayOnline: 'Gateway online',
     gatewayOffline: 'Gateway offline',
+    gatewayWaiting: 'Waiting for reconnection…',
+    gatewayRestored: 'Connection restored',
     offline: 'OFFLINE',
+    live: 'LIVE',
   },
   zh: {
     liveLogs: '实时日志',
@@ -147,7 +150,10 @@ export const I18N = {
     sysLoading: '正在加载系统数据…',
     gatewayOnline: 'Gateway 已上线',
     gatewayOffline: 'Gateway 已离线',
+    gatewayWaiting: '正在等待重新连接…',
+    gatewayRestored: '连接已恢复',
     offline: '离线',
+    live: '在线',
   }
 };
 

@@ -15,3 +15,86 @@
 .toast.success{border-color:rgba(63,185,80,.4);color:var(--green)}
 @keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(20px)}}
+
+/* ═══════════════════════════════════════════════════════════
+   Gateway status overlay
+   ═══════════════════════════════════════════════════════════ */
+.gw-overlay{
+  position:fixed;inset:0;z-index:9997;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.55);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .35s ease,visibility .35s ease;
+}
+.gw-overlay.show{opacity:1;visibility:visible;pointer-events:auto}
+.gw-overlay.hiding{opacity:0;visibility:hidden;pointer-events:none}
+
+.gw-overlay-box{
+  position:relative;
+  width:340px;padding:40px 32px 32px;
+  background:var(--bg-1);border:1px solid var(--border-hi);
+  border-radius:16px;
+  box-shadow:0 24px 80px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04);
+  text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  animation:gw-box-in .35s cubic-bezier(.2,.9,.3,1);
+}
+.gw-overlay.hiding .gw-overlay-box{animation:gw-box-out .3s ease forwards}
+@keyframes gw-box-in{from{opacity:0;transform:scale(.9) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes gw-box-out{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.92)}}
+
+.gw-overlay-close{
+  position:absolute;top:12px;right:12px;
+  width:28px;height:28px;border:none;border-radius:6px;
+  background:transparent;color:var(--t3);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s,color .2s;
+}
+.gw-overlay-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.gw-overlay-close:hover{background:var(--bg-3);color:var(--t1)}
+
+/* ring + icon */
+.gw-ring-wrap{position:relative;width:72px;height:72px}
+.gw-ring{
+  width:72px;height:72px;border-radius:50%;
+  border:3px solid var(--border);
+}
+.gw-icon{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.gw-icon svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* offline state — heartbeat pulse */
+.gw-ring.offline{
+  border-color:var(--red);
+  animation:gw-heartbeat 1.2s ease-in-out infinite;
+}
+.gw-overlay.offline .gw-icon{color:var(--red)}
+.gw-overlay.offline .gw-overlay-title{color:var(--red)}
+
+@keyframes gw-heartbeat{
+  0%  {transform:scale(1);   box-shadow:0 0 0 0 rgba(255,123,114,.4)}
+  15% {transform:scale(1.08);box-shadow:0 0 0 8px rgba(255,123,114,.2)}
+  30% {transform:scale(1);   box-shadow:0 0 0 0 rgba(255,123,114,0)}
+  45% {transform:scale(1.05);box-shadow:0 0 0 5px rgba(255,123,114,.15)}
+  60% {transform:scale(1);   box-shadow:0 0 0 0 rgba(255,123,114,0)}
+  100%{transform:scale(1);   box-shadow:0 0 0 0 rgba(255,123,114,0)}
+}
+
+/* online state — success pop */
+.gw-ring.online{
+  border-color:var(--green);
+  animation:gw-pop .5s cubic-bezier(.2,.9,.3,1);
+}
+.gw-overlay.online .gw-icon{color:var(--green)}
+.gw-overlay.online .gw-overlay-title{color:var(--green)}
+@keyframes gw-pop{
+  0%  {transform:scale(.8);opacity:0}
+  50% {transform:scale(1.1)}
+  100%{transform:scale(1);opacity:1}
+}
+
+.gw-overlay-title{font-size:16px;font-weight:700;color:var(--t0)}
+.gw-overlay-desc{font-size:12px;color:var(--t3);line-height:1.6}

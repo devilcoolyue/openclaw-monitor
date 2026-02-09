@@ -84,5 +84,5 @@ export function appendLogRow(data) {
     S.liveLogs = S.liveLogs.slice(-500);
   }
 
-  if (S.autoScroll) stream.scrollTop = stream.scrollHeight;
+  if (S.autoScroll) stream.scrollTo({ top: stream.scrollHeight, behavior: 'smooth' });
 }

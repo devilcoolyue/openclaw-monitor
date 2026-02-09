@@ -102,3 +102,7 @@ def _find_openclaw():
     return 'openclaw', None
 
 OC_BIN, OC_ENV = _find_openclaw()
+
+# ── Gateway probe ──────────────────────────────────────
+GATEWAY_HOST = '127.0.0.1'
+GATEWAY_PORT = int(os.environ.get('OPENCLAW_GATEWAY_PORT', 18789))

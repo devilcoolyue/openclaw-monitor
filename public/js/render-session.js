@@ -62,5 +62,5 @@ export function appendSessionBlock(data, isLive) {
 
   div.innerHTML = h;
   stream.appendChild(div);
-  if (S.autoScroll) stream.scrollTop = stream.scrollHeight;
+  if (S.autoScroll) stream.scrollTo({ top: stream.scrollHeight, behavior: 'smooth' });
 }

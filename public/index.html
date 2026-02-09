@@ -80,6 +80,19 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
+<!-- ═══ GATEWAY STATUS OVERLAY ════════════════════════════ -->
+<div class="gw-overlay" id="gw-overlay">
+  <div class="gw-overlay-box">
+    <button class="gw-overlay-close" id="gw-overlay-close"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="gw-ring-wrap">
+      <div class="gw-ring" id="gw-overlay-ring"></div>
+      <div class="gw-icon" id="gw-overlay-icon"></div>
+    </div>
+    <div class="gw-overlay-title" id="gw-overlay-title"></div>
+    <div class="gw-overlay-desc" id="gw-overlay-desc"></div>
+  </div>
+</div>
+
 <!-- ═══ SIDEBAR ═══════════════════════════════════════════ -->
 <aside class="sidebar">
   <div class="sb-head">
@@ -88,14 +101,14 @@
   </div>
 
   <div class="sb-nav">
-    <button class="nav-btn active" id="btn-live">
+    <button class="nav-btn active" id="btn-system">
+      <span class="nb-icon icon icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="nb-label">System</span>
+    </button>
+    <button class="nav-btn" id="btn-live">
       <span class="nb-icon icon icon-sm"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
       <span class="nb-label">Live Logs</span>
       <span class="nb-badge" id="evt-cnt">0</span>
-    </button>
-    <button class="nav-btn" id="btn-system">
-      <span class="nb-icon icon icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
-      <span class="nb-label">System</span>
     </button>
   </div>
 
@@ -126,8 +139,8 @@
   <div class="main-hdr">
     <button class="menu-btn" id="menu-btn" title="Menu"><span class="icon icon-lg"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span></button>
     <div class="mh-left">
-      <span class="mh-title" id="mh-title">Live Logs</span>
-      <span class="mh-sub"  id="mh-sub">openclaw logs --follow</span>
+      <span class="mh-title" id="mh-title">System</span>
+      <span class="mh-sub"  id="mh-sub">openclaw system overview</span>
     </div>
     <div class="mh-right">
       <div class="search-box" id="search-box">
@@ -173,6 +186,7 @@
   <div class="stream" id="stream">
     <div class="empty"><div class="ei"></div><p id="stream-wait-text">Waiting for events…</p></div>
   </div>
+  <div class="scroll-pos" id="scroll-pos"><span class="sp-pct"></span><span class="sp-preview"></span></div>
   <button class="scroll-top-btn" id="scroll-top-btn" title="Scroll to top"><span class="icon icon-md"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg></span></button>
 </main>
 

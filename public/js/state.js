@@ -1,6 +1,6 @@
 /* ── Global state object ──────────────────────────────── */
 export const S = {
-  view:        'live',   // 'live' | 'system' | sessionId
+  view:        'system', // 'system' | 'live' | sessionId
   filter:      'all',
   autoScroll:  true,
   sessions:    [],

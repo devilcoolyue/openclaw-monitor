@@ -7,6 +7,7 @@ import http.server
 import json
 import os
 import select
+import socket
 import subprocess
 import time
 from urllib.parse import urlparse
@@ -159,18 +160,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ── GET /api/health ─────────────────────────────────────
     def _api_health(self):
+        # Socket probe to gateway port — ~0.1 ms, no subprocess
+        gw_online = False
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            gw_online = s.connect_ex((config.GATEWAY_HOST, config.GATEWAY_PORT)) == 0
+            s.close()
+        except OSError:
+            pass
+
         result = {
-            'openclaw_available': False,
+            'openclaw_available': gw_online,
             'session_dir_exists': os.path.isdir(config.SESSION_DIR),
             'today_log_exists':   os.path.isfile(config.TODAY_LOG),
         }
-        try:
-            r = subprocess.run([config.OC_BIN, 'health'],
-                               capture_output=True, text=True, timeout=5, env=config.OC_ENV)
-            result['openclaw_available'] = (r.returncode == 0)
-            result['output'] = r.stdout.strip()
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-            pass
         _json_resp(self, result)
 
     # ── GET /api/system ────────────────────────────────────

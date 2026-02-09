@@ -71,10 +71,10 @@ export async function bootCheck() {
     } catch(e) {
       S.sessions = [];
     }
-    switchView('live');
+    switchView('system');
     S.sessionsTimer = setInterval(loadSessions, 5000);
     pollHealth();
-    S.healthTimer = setInterval(pollHealth, 10000);
+    S.healthTimer = setInterval(pollHealth, 3000);
     return;
   }
 
@@ -166,5 +166,5 @@ export async function bootCheck() {
   switchView('live');
   S.sessionsTimer = setInterval(loadSessions, 5000);
   pollHealth();
-  S.healthTimer = setInterval(pollHealth, 10000);
+  S.healthTimer = setInterval(pollHealth, 3000);
 }

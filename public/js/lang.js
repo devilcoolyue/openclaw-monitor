@@ -1,5 +1,6 @@
 import { S } from './state.js';
 import { i18n } from './i18n.js';
+import { updateLiveTag } from './connection.js';
 import { renderSessions } from './sessions.js';
 import { renderSystem } from './render-system.js';
 
@@ -61,6 +62,8 @@ export function updateAllText() {
 
   const waitText = document.getElementById('stream-wait-text');
   if (waitText) waitText.textContent = i18n('waiting');
+
+  updateLiveTag(S.gatewayOnline !== false);
 
   if (S.view === 'system' && S.systemData) {
     renderSystem(S.systemData);
