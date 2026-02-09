@@ -4,9 +4,14 @@ Session file scanning, parsing, and info extraction.
 
 import json
 import os
+import threading
 from datetime import datetime
 
 import config
+
+# ── Session info cache (by file mtime) ───────────────────
+_session_info_cache = {}   # path → (mtime, info_dict)
+_session_cache_lock = threading.Lock()
 
 
 def _find_session_file(session_id: str):
@@ -64,6 +69,17 @@ def _scan_session_files() -> list:
 
 
 def _extract_session_info(path: str, mtime: float = None) -> dict:
+    if mtime is None:
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return {'provider': '', 'model': '', 'status': 'idle', 'message_count': 0}
+
+    with _session_cache_lock:
+        cached = _session_info_cache.get(path)
+        if cached and cached[0] == mtime:
+            return cached[1].copy()
+
     info = {'provider': '', 'model': '', 'status': 'idle', 'message_count': 0}
     total_input = 0
     total_output = 0
@@ -72,10 +88,8 @@ def _extract_session_info(path: str, mtime: float = None) -> dict:
     per_model_usage = {}
     current_model = ''
     try:
-        if mtime is None:
-            mtime = os.path.getmtime(path)
-
-        lines = open(path).readlines()
+        with open(path) as f:
+            lines = f.readlines()
         info['message_count'] = len(lines)
 
         last_event_type = None
@@ -205,4 +219,7 @@ def _extract_session_info(path: str, mtime: float = None) -> dict:
 
     except OSError:
         pass
+
+    with _session_cache_lock:
+        _session_info_cache[path] = (mtime, info)
     return info

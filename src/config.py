@@ -68,6 +68,10 @@ MAX_LOG_LINES_SEC   = 50
 _log_stream_count   = 0
 _log_stream_lock    = threading.Lock()
 
+MAX_SESSION_STREAMS   = 3
+_session_stream_count = 0
+_session_stream_lock  = threading.Lock()
+
 # ── Auth config ─────────────────────────────────────────────
 AUTH_FILE     = os.path.join(BASE_DIR, '.auth')
 SESSION_TTL   = 7 * 24 * 3600  # 7 days

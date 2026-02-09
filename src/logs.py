@@ -5,12 +5,13 @@ Log file resolution, tailing, parsing, and classification.
 import glob as globmod
 import json
 import os
+import select
 import subprocess
 import time
 from datetime import datetime
 
 import config
-from sse import _send_sse
+from sse import _send_sse, _send_sse_heartbeat
 
 
 def _resolve_today_log():
@@ -31,30 +32,51 @@ def _tail_log_file(handler):
 
     proc = subprocess.Popen(
         ['tail', '-f', '-n', '200', log_file],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
+        fd = proc.stdout.fileno()
+        client_fd = handler.connection.fileno()
         sent_this_sec = 0
         window_start  = time.monotonic()
+        buf = b''
 
-        for raw in iter(proc.stdout.readline, ''):
-            line = raw.strip()
-            if not line:
+        while True:
+            readable, _, _ = select.select([fd, client_fd], [], [], 15)
+
+            if not readable:
+                # Timeout — send heartbeat to detect dead connections
+                if not _send_sse_heartbeat(handler):
+                    break
                 continue
 
-            now = time.monotonic()
-            if now - window_start >= 1.0:
-                sent_this_sec = 0
-                window_start  = now
-            if sent_this_sec >= config.MAX_LOG_LINES_SEC:
-                continue
-            sent_this_sec += 1
-
-            data = _parse_log_line(line)
-
-            if not _send_sse(handler, 'log', data):
+            if client_fd in readable:
+                # Client socket became readable → disconnected
                 break
+
+            if fd in readable:
+                chunk = os.read(fd, 8192)
+                if not chunk:
+                    break
+                buf += chunk
+                while b'\n' in buf:
+                    raw, buf = buf.split(b'\n', 1)
+                    line = raw.decode('utf-8', errors='replace').strip()
+                    if not line:
+                        continue
+
+                    now = time.monotonic()
+                    if now - window_start >= 1.0:
+                        sent_this_sec = 0
+                        window_start  = now
+                    if sent_this_sec >= config.MAX_LOG_LINES_SEC:
+                        continue
+                    sent_this_sec += 1
+
+                    data = _parse_log_line(line)
+                    if not _send_sse(handler, 'log', data):
+                        return True
     finally:
-        proc.terminate()
+        proc.kill()
         proc.wait()
     return True
 

@@ -34,6 +34,16 @@ def _json_resp(handler, obj):
     handler.wfile.write(body)
 
 
+def _send_sse_heartbeat(handler):
+    """Send an SSE heartbeat comment. Returns False on dead connection."""
+    try:
+        handler.wfile.write(b': heartbeat\n\n')
+        handler.wfile.flush()
+        return True
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        return False
+
+
 def _read_json_file(path):
     """Safely read and parse a JSON file, return None on error."""
     try:

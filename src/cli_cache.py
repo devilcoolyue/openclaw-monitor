@@ -1,8 +1,9 @@
 """
 Background CLI cache: runs openclaw CLI commands periodically and caches results.
+Run commands sequentially to avoid memory spikes — each openclaw CLI
+process is a Node.js app that consumes ~500MB RAM.
 """
 
-import concurrent.futures
 import json
 import subprocess
 import threading
@@ -49,16 +50,18 @@ def _run_cli_cached(cmd, timeout=30):
 
 
 def _cli_cache_worker():
-    """Background thread: refresh CLI data periodically."""
+    """Background thread: refresh CLI data periodically (sequentially)."""
     while True:
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-                f_channel  = pool.submit(_run_cli_cached, [config.OC_BIN, 'status', '--json'])
-                f_presence = pool.submit(_run_cli_cached, [config.OC_BIN, 'system', 'presence'])
-                ch = f_channel.result(timeout=60)
-                pr = f_presence.result(timeout=60)
+            ch = _run_cli_cached([config.OC_BIN, 'status', '--json'])
             with _cli_cache_lock:
                 _cli_cache['channel_health'] = ch
+                _cli_cache['lastUpdated'] = time.time()
+        except Exception:
+            pass
+        try:
+            pr = _run_cli_cached([config.OC_BIN, 'system', 'presence'])
+            with _cli_cache_lock:
                 _cli_cache['presence'] = pr
                 _cli_cache['lastUpdated'] = time.time()
         except Exception:

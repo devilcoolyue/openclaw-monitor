@@ -6,6 +6,7 @@ import http.cookies
 import http.server
 import json
 import os
+import select
 import subprocess
 import time
 from urllib.parse import urlparse
@@ -17,7 +18,7 @@ import diagnostics
 import logs
 import sessions
 import jsonl
-from sse import _begin_sse, _send_sse, _json_resp, _read_json_file
+from sse import _begin_sse, _send_sse, _send_sse_heartbeat, _json_resp, _read_json_file
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -27,6 +28,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # suppress per-request logging
     def log_message(self, *_): pass
+
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # client disconnected, nothing to do
 
     # ── auth guard ───────────────────────────────────────────
     def _require_auth(self, api=False):
@@ -273,6 +280,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ── SSE /api/session/<id>/stream ────────────────────────
     def _api_session_stream(self, session_id):
+        with config._session_stream_lock:
+            if config._session_stream_count >= config.MAX_SESSION_STREAMS:
+                _begin_sse(self)
+                _send_sse(self, 'status', {
+                    'type': 'warn',
+                    'message': f'Too many session streams ({config.MAX_SESSION_STREAMS} max). '
+                               'Close another tab and retry.'
+                })
+                return
+            config._session_stream_count += 1
+
         _begin_sse(self)
 
         session_file = os.path.join(config.SESSION_DIR, f'{session_id}.jsonl')
@@ -281,6 +299,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 'type': 'error',
                 'message': f'Session file not found: {session_file}'
             })
+            with config._session_stream_lock:
+                config._session_stream_count -= 1
             return
 
         proc = None
@@ -294,16 +314,40 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             _send_sse(self, 'history_done', {})
 
-            # tail for new lines
+            # tail for new lines (non-blocking with select)
             proc = subprocess.Popen(
                 ['tail', '-f', '-n', '0', session_file],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            for raw in iter(proc.stdout.readline, ''):
-                parsed = jsonl._parse_jsonl_line(raw)
-                if parsed and not _send_sse(self, 'session_event', parsed):
+            fd = proc.stdout.fileno()
+            client_fd = self.connection.fileno()
+            buf = b''
+
+            while True:
+                readable, _, _ = select.select([fd, client_fd], [], [], 15)
+
+                if not readable:
+                    if not _send_sse_heartbeat(self):
+                        break
+                    continue
+
+                if client_fd in readable:
                     break
+
+                if fd in readable:
+                    chunk = os.read(fd, 8192)
+                    if not chunk:
+                        break
+                    buf += chunk
+                    while b'\n' in buf:
+                        raw, buf = buf.split(b'\n', 1)
+                        parsed = jsonl._parse_jsonl_line(
+                            raw.decode('utf-8', errors='replace'))
+                        if parsed and not _send_sse(self, 'session_event', parsed):
+                            return
         finally:
             if proc:
-                proc.terminate()
+                proc.kill()
                 proc.wait()
+            with config._session_stream_lock:
+                config._session_stream_count -= 1
