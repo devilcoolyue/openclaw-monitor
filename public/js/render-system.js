@@ -320,28 +320,23 @@ function renderPromptReport(data) {
 
 function renderSkillsSnapshot(data) {
   if (!data || !Array.isArray(data) || data.length === 0) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
-  let h = '';
-  data.forEach(entry => {
+  return data.map(entry => {
+    const sid = (entry.sessionId || '').substring(0,8) + '…';
     const snap = entry.snapshot;
-    if (!snap) return;
+    if (!snap) return '';
+    let names = [];
     if (typeof snap === 'object' && snap.prompt) {
-      const matches = [...snap.prompt.matchAll(/<name>([^<]+)<\/name>/g)];
-      if (matches.length > 0) {
-        h += `<div style="display:flex;flex-wrap:wrap;gap:2px">`;
-        matches.forEach(m => { h += `<span class="sys-tag">${esc(m[1])}</span>`; });
-        h += `</div>`;
-      } else {
-        h += `<div class="sys-pre">${esc(snap.prompt.substring(0,500))}</div>`;
-      }
+      names = [...snap.prompt.matchAll(/<name>([^<]+)<\/name>/g)].map(m => m[1]);
     } else if (Array.isArray(snap)) {
-      h += `<div style="display:flex;flex-wrap:wrap;gap:2px">`;
-      snap.forEach(s => { h += `<span class="sys-tag">${esc(typeof s === 'string' ? s : s.name || JSON.stringify(s))}</span>`; });
-      h += `</div>`;
-    } else {
-      h += renderKvFromObj(snap);
+      names = snap.map(s => typeof s === 'string' ? s : s.name || JSON.stringify(s));
     }
-  });
-  return h || `<span class="sys-empty">${i18n('sysNoData')}</span>`;
+    if (names.length === 0) return '';
+    let h = `<div style="margin-bottom:6px"><strong style="color:var(--t0)">${sid}</strong> <span style="font-size:10px;color:var(--t3)">(${names.length})</span></div>`;
+    h += `<div style="display:flex;flex-wrap:wrap;gap:2px">`;
+    names.forEach(n => { h += `<span class="sys-tag">${esc(n)}</span>`; });
+    h += `</div>`;
+    return h;
+  }).filter(Boolean).join('<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">') || `<span class="sys-empty">${i18n('sysNoData')}</span>`;
 }
 
 function renderCompaction(data) {

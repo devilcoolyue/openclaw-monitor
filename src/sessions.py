@@ -8,10 +8,79 @@ import threading
 from datetime import datetime
 
 import config
+from sse import _read_json_file
 
 # ── Session info cache (by file mtime) ───────────────────
 _session_info_cache = {}   # path → (mtime, info_dict)
 _session_cache_lock = threading.Lock()
+
+
+def _load_session_meta() -> dict:
+    """Load sessions.json and build sessionId → metadata reverse lookup."""
+    data = _read_json_file(config.SESSIONS_JSON)
+    if not data or not isinstance(data, dict):
+        return {}
+    lookup = {}
+    for key, val in data.items():
+        sid = val.get('sessionId')
+        if not sid:
+            continue
+        origin = val.get('origin', {})
+        lookup[sid] = {
+            'sessionKey': key,
+            'chatType': val.get('chatType', ''),
+            'originLabel': origin.get('label', ''),
+            'originProvider': origin.get('provider', ''),
+            'displayName': val.get('displayName', ''),
+        }
+    return lookup
+
+
+def _derive_label(meta: dict) -> tuple:
+    """Derive (labelType, label) from session metadata.
+
+    Returns (labelType, label) where label is the fallback display text
+    and labelType is used by frontend for i18n mapping.
+    """
+    key = meta.get('sessionKey', '')
+    chat_type = meta.get('chatType', '')
+    origin_label = meta.get('originLabel', '')
+    origin_provider = meta.get('originProvider', '')
+    display_name = meta.get('displayName', '')
+
+    if origin_label == 'heartbeat' or origin_provider == 'heartbeat':
+        return ('heartbeat', 'Heartbeat')
+    if 'cron:' in key:
+        return ('cron', 'Cron Task')
+    if 'feishu:' in key or origin_provider == 'feishu':
+        if chat_type == 'group':
+            return ('feishu_group', 'Feishu Group')
+        return ('feishu_dm', 'Feishu DM')
+    if key == 'agent:main:main':
+        return ('main', 'Main Session')
+    if display_name and display_name != '-':
+        return ('custom', display_name)
+    return ('', '')
+
+
+def _enrich_with_meta(sessions: list) -> list:
+    """Merge metadata labels into session list."""
+    meta_lookup = _load_session_meta()
+    for s in sessions:
+        sid = s.get('id', '')
+        meta = meta_lookup.get(sid)
+        if meta:
+            label_type, label = _derive_label(meta)
+            s['labelType'] = label_type
+            s['label'] = label
+        else:
+            s['labelType'] = ''
+            s['label'] = ''
+        # Use firstMsg as fallback if no label derived
+        if not s.get('label') and s.get('firstMsg'):
+            s['label'] = s['firstMsg']
+            s['labelType'] = 'firstMsg'
+    return sessions
 
 
 def _find_session_file(session_id: str):
@@ -46,7 +115,7 @@ def _parse_oc_sessions(output: str) -> list:
             info['mtime'] = mtime
             info.update(_extract_session_info(path, mtime))
         sessions.append(info)
-    return sessions
+    return _enrich_with_meta(sessions)
 
 
 def _scan_session_files() -> list:
@@ -65,7 +134,7 @@ def _scan_session_files() -> list:
         info['mtime'] = mtime
         entries.append(info)
     entries.sort(key=lambda e: e.get('mtime', 0), reverse=True)
-    return entries
+    return _enrich_with_meta(entries)
 
 
 def _extract_session_info(path: str, mtime: float = None) -> dict:
@@ -87,6 +156,7 @@ def _extract_session_info(path: str, mtime: float = None) -> dict:
     total_cost = 0.0
     per_model_usage = {}
     current_model = ''
+    first_msg = ''
     try:
         with open(path) as f:
             lines = f.readlines()
@@ -146,6 +216,17 @@ def _extract_session_info(path: str, mtime: float = None) -> dict:
                 msg = obj.get('message', {})
                 last_role = msg.get('role', '')
                 content = msg.get('content', [])
+
+                if not first_msg and last_role == 'user' and isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get('type') == 'text':
+                            txt = (block.get('text') or '').strip()
+                            if txt:
+                                first_msg = txt[:30]
+                                break
+                        elif isinstance(block, str) and block.strip():
+                            first_msg = block.strip()[:30]
+                            break
 
                 if last_role == 'assistant' and isinstance(content, list):
                     for block in content:
@@ -219,6 +300,9 @@ def _extract_session_info(path: str, mtime: float = None) -> dict:
 
     except OSError:
         pass
+
+    if first_msg:
+        info['firstMsg'] = first_msg
 
     with _session_cache_lock:
         _session_info_cache[path] = (mtime, info)

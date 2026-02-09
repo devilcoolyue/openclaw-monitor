@@ -7,6 +7,21 @@ import { closeES, clearStream, setConn } from './connection.js';
 import { startLive, startSession } from './sse.js';
 import { loadSystem, renderSystem } from './render-system.js';
 
+const _LABEL_I18N = {
+  heartbeat: 'sessHeartbeat',
+  cron: 'sessCron',
+  feishu_group: 'sessFeishuGroup',
+  feishu_dm: 'sessFeishuDM',
+  main: 'sessMain',
+};
+
+function _sessionLabel(s) {
+  const key = _LABEL_I18N[s.labelType];
+  if (key) return i18n(key);
+  if (s.label) return s.label;
+  return s.id.substring(0,8) + '-' + s.id.substring(9,13) + '…';
+}
+
 let _sessionsLoading = false;
 export async function loadSessions() {
   if (_sessionsLoading) return;
@@ -35,20 +50,21 @@ export function renderSessions() {
   document.getElementById('sess-active').textContent = active ? `${active} ${i18n('active')}` : '';
 
   el.innerHTML = S.sessions.map(s => {
-    const short = s.id.substring(0,8) + '-' + s.id.substring(9,13) + '…';
+    const label = _sessionLabel(s);
+    const shortId = s.id.substring(0,8) + '…';
     const isAct = S.view === s.id;
     const proc  = s.status === 'processing';
     const statusText = proc ? i18n('processing') : fmtIdleTime(s.idle_since);
     return `<div class="s-card${isAct?' active':''}${proc?' processing':''}" data-session="${s.id}" onclick="switchView('${s.id}')">
       <div class="s-card-top">
-        <span class="s-card-id">${short}</span>
+        <span class="s-card-id">${esc(label)}</span>
         <span class="badge ${proc?'badge-proc':'badge-idle'}">
           ${proc?'<span class="bd"></span>':''}${statusText}
         </span>
       </div>
       <div class="s-card-bot">
-        <span>${s.provider||'—'} / ${s.model||'—'}</span>
-        <span>${s.message_count||0} ${i18n('msgs')}</span>
+        <span>${esc(shortId)} · ${s.message_count||0} ${i18n('msgs')}</span>
+        <span>${s.model||'—'}</span>
       </div>
     </div>`;
   }).join('');
@@ -99,8 +115,9 @@ function updateSessionSummary() {
   }
 
   const statusTxt = (sess.status === 'processing') ? i18n('processing') : i18n('idle');
+  const label = _sessionLabel(sess);
   document.getElementById('ss-toggle-info').textContent =
-    `${id.substring(0,8)}… · ${sess.model||'—'} · ${statusTxt}`;
+    `${label} · ${sess.model||'—'} · ${statusTxt}`;
 }
 
 export function switchView(id) {
@@ -137,7 +154,8 @@ export function switchView(id) {
     if (card) card.classList.add('active');
     const sess = S.sessions.find(s => s.id === id);
 
-    document.getElementById('mh-title').textContent = id.substring(0,20) + '…';
+    const label = sess ? _sessionLabel(sess) : id.substring(0,20) + '…';
+    document.getElementById('mh-title').textContent = label;
     const modelNames = sess?.models ? Object.keys(sess.models) : [];
     document.getElementById('mh-sub').textContent = sess
       ? (modelNames.length > 0 ? modelNames.join(' / ') : (sess.model || '—'))

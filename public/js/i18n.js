@@ -77,6 +77,11 @@ export const I18N = {
     gatewayRestored: 'Connection restored',
     offline: 'OFFLINE',
     live: 'LIVE',
+    sessHeartbeat: 'Heartbeat',
+    sessCron: 'Cron Task',
+    sessFeishuGroup: 'Feishu Group',
+    sessFeishuDM: 'Feishu DM',
+    sessMain: 'Main Session',
   },
   zh: {
     liveLogs: '实时日志',
@@ -154,6 +159,11 @@ export const I18N = {
     gatewayRestored: '连接已恢复',
     offline: '离线',
     live: '在线',
+    sessHeartbeat: '心跳会话',
+    sessCron: '定时任务',
+    sessFeishuGroup: '飞书群聊',
+    sessFeishuDM: '飞书私聊',
+    sessMain: '主会话',
   }
 };
 
