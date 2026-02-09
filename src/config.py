@@ -73,9 +73,13 @@ _session_stream_count = 0
 _session_stream_lock  = threading.Lock()
 
 # ── Auth config ─────────────────────────────────────────────
-AUTH_FILE     = os.path.join(BASE_DIR, '.auth')
-SESSION_TTL   = 7 * 24 * 3600  # 7 days
-COOKIE_NAME   = 'monitor_sid'
+AUTH_FILE          = os.path.join(BASE_DIR, '.auth')
+AUTH_REQUIRED_FILE = os.path.join(BASE_DIR, '.auth_required')
+SESSION_TTL        = 7 * 24 * 3600  # 7 days
+COOKIE_NAME        = 'monitor_sid'
+
+# Env var set by systemd unit — survives file deletion
+ENV_AUTH_REQUIRED  = os.environ.get('MONITOR_AUTH') == '1'
 
 # ── Resolve openclaw binary + env ────────────────────────────
 def _find_openclaw():

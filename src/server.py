@@ -50,11 +50,12 @@ if __name__ == '__main__':
     print(f'\n  openclaw Monitor  →  {url}')
     print(f'  version         : {ver["version"]}')
 
-    from auth import AUTH_ENABLED  # noqa: E402
-    if AUTH_ENABLED:
-        print(f'  auth            : enabled (password required)')
-    else:
-        print(f'  auth            : disabled (no .auth file)')
+    from auth import _auth_status  # noqa: E402
+    _status = _auth_status()
+    _status_label = {'enabled': 'enabled (password required)',
+                     'locked':  'LOCKED (auth file missing — all access denied)',
+                     'disabled': 'disabled (no .auth file)'}
+    print(f'  auth            : {_status_label.get(_status, _status)}')
     if config.ARGS.tailscale:
         print(f'  tailscale       : {BIND_HOST}')
     print(f'  session dir     : {config.SESSION_DIR}')

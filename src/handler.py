@@ -39,10 +39,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # ── auth guard ───────────────────────────────────────────
     def _require_auth(self, api=False):
         """Return True if request should be blocked (not authenticated)."""
-        if not auth.AUTH_ENABLED:
+        status = auth._auth_status()
+
+        if status == 'disabled':
             return False
-        if auth._check_auth(self):
+        if status == 'enabled' and auth._check_auth(self):
             return False
+
+        # 'locked' → auth file missing/tampered, refuse everything
+        if status == 'locked':
+            if api:
+                body = json.dumps({'error': 'System locked — auth file missing'}).encode()
+                self.send_response(403)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                body = auth.LOCKED_HTML.encode('utf-8')
+                self.send_response(403)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            return True
+
+        # 'enabled' but not authenticated → login page
         if api:
             body = json.dumps({'error': 'Unauthorized'}).encode()
             self.send_response(401)
@@ -95,6 +117,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ── POST /api/login ──────────────────────────────────────
     def _api_login(self):
+        # If system is locked, reject all login attempts
+        if auth._auth_status() == 'locked':
+            resp = json.dumps({'ok': False, 'error': 'System locked — auth file missing'}).encode()
+            self.send_response(403)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         try:
             length = int(self.headers.get('Content-Length', 0))
             body = json.loads(self.rfile.read(length)) if length else {}

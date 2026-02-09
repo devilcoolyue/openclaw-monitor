@@ -51,6 +51,7 @@ fi
 cd "$PROJECT_DIR"
 
 AUTH_FILE=".auth"
+AUTH_REQUIRED_FILE=".auth_required"
 
 echo ""
 echo "  openclaw-monitor — Setup"
@@ -62,8 +63,13 @@ echo ""
 # ── Password setup ────────────────────────────────────────
 if [ -f "$AUTH_FILE" ]; then
     echo "  Existing password found, keeping it."
-    echo "  (To reset, delete .auth and re-run install.sh)"
+    echo "  (To reset: chattr -i .auth .auth_required && rm .auth && re-run install.sh)"
     echo ""
+    # Ensure sentinel + immutable flags exist (idempotent)
+    [ -f "$AUTH_REQUIRED_FILE" ] || touch "$AUTH_REQUIRED_FILE"
+    chmod 600 "$AUTH_REQUIRED_FILE" 2>/dev/null || true
+    chattr +i "$AUTH_FILE" 2>/dev/null || true
+    chattr +i "$AUTH_REQUIRED_FILE" 2>/dev/null || true
 else
     # Prompt for admin password
     # Use /dev/tty so it works when piped from curl
@@ -95,6 +101,15 @@ print(salt + ':' + h)
 
     echo "$AUTH_ENTRY" > "$AUTH_FILE"
     chmod 600 "$AUTH_FILE"
+
+    # Create sentinel file — marks that auth was configured
+    touch "$AUTH_REQUIRED_FILE"
+    chmod 600 "$AUTH_REQUIRED_FILE"
+
+    # Lock both files with immutable attribute (chattr +i)
+    # Prevents deletion even by root without explicit chattr -i first
+    chattr +i "$AUTH_FILE" 2>/dev/null || true
+    chattr +i "$AUTH_REQUIRED_FILE" 2>/dev/null || true
 fi
 
 # Make scripts executable
@@ -123,6 +138,7 @@ After=network.target
 Type=simple
 WorkingDirectory=$PROJECT_DIR
 ExecStart=$(command -v python3) $PROJECT_DIR/src/server.py --port $PORT $EXTRA_ARGS
+Environment=MONITOR_AUTH=1
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:$PROJECT_DIR/monitor.log

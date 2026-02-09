@@ -5,6 +5,7 @@ Authentication: password verification, session management, login page.
 import hashlib
 import http.cookies
 import json
+import os
 import secrets
 import time
 
@@ -66,7 +67,22 @@ def _check_auth(handler):
     return True
 
 
-AUTH_ENABLED = _load_auth() is not None
+def _auth_status():
+    """Determine auth status dynamically. Returns 'disabled', 'enabled', or 'locked'.
+
+    - disabled: no auth configured (never set up)
+    - enabled:  .auth file present, normal password auth
+    - locked:   auth was configured but .auth file is missing (fail-closed)
+    """
+    has_auth_file = _load_auth() is not None
+    # Auth is required if: env var set by systemd OR sentinel file exists
+    auth_required = config.ENV_AUTH_REQUIRED or os.path.exists(config.AUTH_REQUIRED_FILE)
+
+    if has_auth_file:
+        return 'enabled'
+    if auth_required:
+        return 'locked'
+    return 'disabled'
 
 LOGIN_HTML = '''<!DOCTYPE html>
 <html lang="en">
@@ -129,5 +145,37 @@ document.getElementById('login-form').addEventListener('submit', async function(
   }
 });
 </script>
+</body>
+</html>'''
+
+LOCKED_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>openclaw monitor — Locked</title>
+<style>
+:root{--bg-0:#0a0e13;--bg-1:#111519;--border:#1e2530;--t0:#e6edf3;--t1:#c9d1d9;--t2:#8b949e;--t3:#6e7681;--red:#ff7b72;--yellow:#d29922}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'SF Mono','Fira Code','Consolas','Courier New',monospace;background:var(--bg-0);color:var(--t1);display:flex;align-items:center;justify-content:center}
+.lock-box{width:400px;background:var(--bg-1);border:1px solid var(--red);border-radius:10px;padding:36px 30px 30px}
+.lock-icon{font-size:32px;text-align:center;margin-bottom:12px}
+.lock-title{font-size:16px;font-weight:700;color:var(--red);text-align:center;margin-bottom:8px}
+.lock-msg{font-size:12px;color:var(--t2);text-align:center;line-height:1.6;margin-bottom:20px}
+.lock-cmd{background:#0d1117;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:11px;color:var(--yellow);line-height:1.8;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="lock-box">
+  <div class="lock-icon">&#x1F512;</div>
+  <div class="lock-title">System Locked</div>
+  <div class="lock-msg">
+    Authentication file missing or tampered.<br>
+    The system has been locked down for security.<br>
+    Re-run the installer to restore access:
+  </div>
+  <div class="lock-cmd">./scripts/install.sh</div>
+</div>
 </body>
 </html>'''

@@ -60,7 +60,11 @@ if [ -L "$CLI_LINK" ]; then
 fi
 
 # ── Remove auth and log files ─────────────────────────────
+# Unlock immutable attribute before removal
+chattr -i "$PROJECT_DIR/.auth" 2>/dev/null || true
+chattr -i "$PROJECT_DIR/.auth_required" 2>/dev/null || true
 rm -f "$PROJECT_DIR/.auth" 2>/dev/null || true
+rm -f "$PROJECT_DIR/.auth_required" 2>/dev/null || true
 rm -f "$PROJECT_DIR/monitor.log" 2>/dev/null || true
 echo "  Auth and log files removed."
 
