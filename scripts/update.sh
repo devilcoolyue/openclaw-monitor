@@ -39,6 +39,17 @@ fi
 CURRENT=$(git log -1 --format='%h (%ci)' 2>/dev/null | sed 's/ [+-][0-9]*$//')
 echo "  Current version : $CURRENT"
 
+# ── Ensure sparse checkout is configured ──────────────────
+# If this is a full clone, set up sparse checkout to skip large assets on future pulls
+if ! git sparse-checkout list &>/dev/null || [ "$(git config core.sparseCheckout)" != "true" ]; then
+    if [ -d "image" ] || [ -d "openclaw-env-install" ]; then
+        echo "  Optimizing: enabling sparse checkout to skip large assets..."
+        git sparse-checkout init --cone
+        git sparse-checkout set src public scripts bin \
+            CLAUDE.md LICENSE README.md README.en.md .gitignore
+    fi
+fi
+
 # ── Fetch remote ──────────────────────────────────────────
 echo "  Fetching updates..."
 git fetch origin 2>/dev/null

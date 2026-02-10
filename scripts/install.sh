@@ -39,9 +39,13 @@ else
         echo "  Updating existing installation at $INSTALL_DIR ..."
         git -C "$INSTALL_DIR" pull --ff-only
     else
-        echo "  Cloning to $INSTALL_DIR ..."
+        echo "  Cloning to $INSTALL_DIR (lightweight, ~400K) ..."
         mkdir -p "$(dirname "$INSTALL_DIR")"
-        git clone "$REPO_URL" "$INSTALL_DIR"
+        # Sparse checkout: only download src/ public/ scripts/ bin/ and root config files
+        # Skips image/ (~13MB) and other non-essential directories
+        git clone --depth 1 --filter=blob:none --sparse "$REPO_URL" "$INSTALL_DIR"
+        git -C "$INSTALL_DIR" sparse-checkout set src public scripts bin \
+            CLAUDE.md LICENSE README.md README.en.md .gitignore
     fi
 
     PROJECT_DIR="$INSTALL_DIR"
