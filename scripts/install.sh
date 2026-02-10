@@ -44,8 +44,8 @@ else
         # Sparse checkout: only download src/ public/ scripts/ bin/ and root config files
         # Skips image/ (~13MB) and other non-essential directories
         git clone --depth 1 --filter=blob:none --sparse "$REPO_URL" "$INSTALL_DIR"
-        git -C "$INSTALL_DIR" sparse-checkout set src public scripts bin \
-            CLAUDE.md LICENSE README.md README.en.md .gitignore
+        # Cone mode automatically includes all root-level files (CLAUDE.md, LICENSE, etc.)
+        git -C "$INSTALL_DIR" sparse-checkout set src public scripts bin
     fi
 
     PROJECT_DIR="$INSTALL_DIR"

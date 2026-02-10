@@ -45,8 +45,7 @@ if ! git sparse-checkout list &>/dev/null || [ "$(git config core.sparseCheckout
     if [ -d "image" ] || [ -d "openclaw-env-install" ]; then
         echo "  Optimizing: enabling sparse checkout to skip large assets..."
         git sparse-checkout init --cone
-        git sparse-checkout set src public scripts bin \
-            CLAUDE.md LICENSE README.md README.en.md .gitignore
+        git sparse-checkout set src public scripts bin
     fi
 fi
 
