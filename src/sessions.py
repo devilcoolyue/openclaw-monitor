@@ -64,10 +64,15 @@ def _derive_label(meta: dict) -> tuple:
 
 
 def _enrich_with_meta(sessions: list) -> list:
-    """Merge metadata labels into session list."""
+    """Merge metadata labels into session list, dedupe by session id."""
     meta_lookup = _load_session_meta()
+    seen_ids = set()
+    result = []
     for s in sessions:
         sid = s.get('id', '')
+        if not sid or sid in seen_ids:
+            continue
+        seen_ids.add(sid)
         meta = meta_lookup.get(sid)
         if meta:
             label_type, label = _derive_label(meta)
@@ -80,7 +85,8 @@ def _enrich_with_meta(sessions: list) -> list:
         if not s.get('label') and s.get('firstMsg'):
             s['label'] = s['firstMsg']
             s['labelType'] = 'firstMsg'
-    return sessions
+        result.append(s)
+    return result
 
 
 def _find_session_file(session_id: str):
