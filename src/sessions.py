@@ -32,6 +32,7 @@ def _load_session_meta() -> dict:
             'originLabel': origin.get('label', ''),
             'originProvider': origin.get('provider', ''),
             'displayName': val.get('displayName', ''),
+            'lastChannel': val.get('lastChannel', ''),
         }
     return lookup
 
@@ -47,15 +48,17 @@ def _derive_label(meta: dict) -> tuple:
     origin_label = meta.get('originLabel', '')
     origin_provider = meta.get('originProvider', '')
     display_name = meta.get('displayName', '')
+    last_channel = meta.get('lastChannel', '')
 
     if origin_label == 'heartbeat' or origin_provider == 'heartbeat':
         return ('heartbeat', 'Heartbeat')
     if 'cron:' in key:
         return ('cron', 'Cron Task')
-    if 'feishu:' in key or origin_provider == 'feishu':
-        if chat_type == 'group':
-            return ('feishu_group', 'Feishu Group')
-        return ('feishu_dm', 'Feishu DM')
+    # Generic platform detection: use origin.provider or lastChannel
+    provider = origin_provider or last_channel
+    if provider and provider != 'heartbeat':
+        suffix = 'group' if chat_type == 'group' else 'dm'
+        return (f'{provider}_{suffix}', f'{provider} {suffix}')
     if key == 'agent:main:main':
         return ('main', 'Main Session')
     if display_name and display_name != '-':

@@ -12,12 +12,24 @@ const _LABEL_I18N = {
   cron: 'sessCron',
   feishu_group: 'sessFeishuGroup',
   feishu_dm: 'sessFeishuDM',
+  ddingtalk_group: 'sessDdingtalkGroup',
+  ddingtalk_dm: 'sessDdingtalkDM',
+  qqbot_group: 'sessQqbotGroup',
+  qqbot_dm: 'sessQqbotDM',
+  wecom_group: 'sessWecomGroup',
+  wecom_dm: 'sessWecomDM',
   main: 'sessMain',
 };
 
 function _sessionLabel(s) {
   const key = _LABEL_I18N[s.labelType];
   if (key) return i18n(key);
+  // Generic fallback: parse "{provider}_{dm|group}" for unknown platforms
+  const m = s.labelType?.match(/^(.+)_(dm|group)$/);
+  if (m) {
+    const suffix = m[2] === 'group' ? i18n('sessGroupSuffix') : i18n('sessDmSuffix');
+    return m[1] + ' ' + suffix;
+  }
   if (s.label) return s.label;
   return s.id.substring(0,8) + '-' + s.id.substring(9,13) + '…';
 }

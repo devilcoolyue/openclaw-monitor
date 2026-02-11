@@ -81,7 +81,15 @@ export const I18N = {
     sessCron: 'Cron Task',
     sessFeishuGroup: 'Feishu Group',
     sessFeishuDM: 'Feishu DM',
+    sessDdingtalkGroup: 'DingTalk Group',
+    sessDdingtalkDM: 'DingTalk DM',
+    sessQqbotGroup: 'QQ Group',
+    sessQqbotDM: 'QQ DM',
+    sessWecomGroup: 'WeCom Group',
+    sessWecomDM: 'WeCom DM',
     sessMain: 'Main Session',
+    sessGroupSuffix: 'Group',
+    sessDmSuffix: 'DM',
   },
   zh: {
     liveLogs: '实时日志',
@@ -163,7 +171,15 @@ export const I18N = {
     sessCron: '定时任务',
     sessFeishuGroup: '飞书群聊',
     sessFeishuDM: '飞书私聊',
+    sessDdingtalkGroup: '钉钉群聊',
+    sessDdingtalkDM: '钉钉私聊',
+    sessQqbotGroup: 'QQ群聊',
+    sessQqbotDM: 'QQ私聊',
+    sessWecomGroup: '企业微信群聊',
+    sessWecomDM: '企业微信私聊',
     sessMain: '主会话',
+    sessGroupSuffix: '群聊',
+    sessDmSuffix: '私聊',
   }
 };
 
