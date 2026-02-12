@@ -6,6 +6,7 @@ import { isMobile, closeSidebar } from './mobile.js';
 import { closeES, clearStream, setConn } from './connection.js';
 import { startLive, startSession } from './sse.js';
 import { loadSystem, renderSystem } from './render-system.js';
+import { loadModels } from './render-models.js';
 
 const _LABEL_I18N = {
   heartbeat: 'sessHeartbeat',
@@ -84,7 +85,7 @@ export function renderSessions() {
 
 function updateSessionSummary() {
   const id = S.view;
-  if (id === 'live' || id === 'system') return;
+  if (id === 'live' || id === 'system' || id === 'models') return;
   const sess = S.sessions.find(s => s.id === id);
   if (!sess) return;
 
@@ -161,6 +162,15 @@ export function switchView(id) {
     setConn('connected');
     loadSystem();
     S.systemTimer = setInterval(loadSystem, 30000);
+  } else if (id === 'models') {
+    document.getElementById('btn-models').classList.add('active');
+    document.getElementById('mh-title').textContent = i18n('modelSwitch');
+    document.getElementById('mh-sub').textContent   = i18n('modelSwitchSub');
+    document.getElementById('filters').style.display = 'none';
+    document.getElementById('search-box').style.display = 'none';
+    document.getElementById('sess-summary').style.display = 'none';
+    setConn('connected');
+    loadModels();
   } else {
     const card = document.querySelector(`[data-session="${id}"]`);
     if (card) card.classList.add('active');

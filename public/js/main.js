@@ -5,6 +5,7 @@ import { initLang, toggleLang } from './lang.js';
 import { openSidebar, closeSidebar } from './mobile.js';
 import { switchView, loadSessions } from './sessions.js';
 import { loadSystem } from './render-system.js';
+import { loadModels } from './render-models.js';
 import { bootCheck } from './boot.js';
 import { initGwOverlay } from './connection.js';
 import { reRenderLive } from './filter.js';
@@ -13,6 +14,7 @@ import { reRenderLive } from './filter.js';
 window.switchView = switchView;
 window.bootCheck = bootCheck;
 window.loadSystem = loadSystem;
+window.loadModels = loadModels;
 
 function initAutoScroll() {
   const saved = localStorage.getItem('autoScroll');
@@ -31,6 +33,7 @@ function fetchVersion() {
 
 function bindAll() {
   document.getElementById('btn-live').onclick = () => switchView('live');
+  document.getElementById('btn-models').onclick = () => switchView('models');
   document.getElementById('btn-system').onclick = () => switchView('system');
 
   document.getElementById('menu-btn').onclick = () => {

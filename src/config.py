@@ -51,12 +51,14 @@ TODAY_LOG   = os.path.join(LOG_DIR, f"openclaw-{datetime.now().strftime('%Y-%m-%
 
 # ── System monitoring paths ─────────────────────────────────
 OC_ROOT         = os.path.expanduser("~/.openclaw")
+OPENCLAW_CONFIG = os.path.join(OC_ROOT, "openclaw.json")
 SESSIONS_JSON   = os.path.join(SESSION_DIR, "sessions.json")
 DEVICES_PAIRED  = os.path.join(OC_ROOT, "devices", "paired.json")
 DEVICES_PENDING = os.path.join(OC_ROOT, "devices", "pending.json")
 CRON_JOBS       = os.path.join(OC_ROOT, "cron", "jobs.json")
 UPDATE_CHECK    = os.path.join(OC_ROOT, "update-check.json")
 EXEC_APPROVALS  = os.path.join(OC_ROOT, "exec-approvals.json")
+MODEL_SWITCH_LOCK = threading.Lock()
 
 # ── Regex patterns ───────────────────────────────────────────
 UUID_RE = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)

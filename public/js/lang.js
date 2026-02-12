@@ -3,6 +3,7 @@ import { i18n } from './i18n.js';
 import { updateLiveTag } from './connection.js';
 import { renderSessions } from './sessions.js';
 import { renderSystem } from './render-system.js';
+import { renderModels } from './render-models.js';
 
 export function initLang() {
   const saved = localStorage.getItem('lang') || 'zh';
@@ -26,10 +27,14 @@ export function applyLang(lang) {
 export function updateAllText() {
   document.querySelector('.sb-label').innerHTML = `${i18n('sessions')} <span id="sess-active" style="color:var(--green);margin-left:6px"></span>`;
   document.querySelector('#btn-live .nb-label').textContent = i18n('liveLogs');
+  document.querySelector('#btn-models .nb-label').textContent = i18n('modelSwitch');
   document.querySelector('#btn-system .nb-label').textContent = i18n('system');
 
   if (S.view === 'live') {
     document.getElementById('mh-title').textContent = i18n('liveLogs');
+  } else if (S.view === 'models') {
+    document.getElementById('mh-title').textContent = i18n('modelSwitch');
+    document.getElementById('mh-sub').textContent = i18n('modelSwitchSub');
   } else if (S.view === 'system') {
     document.getElementById('mh-title').textContent = i18n('system');
   }
@@ -67,6 +72,9 @@ export function updateAllText() {
 
   if (S.view === 'system' && S.systemData) {
     renderSystem(S.systemData);
+  }
+  if (S.view === 'models' && S.modelsData) {
+    renderModels(S.modelsData);
   }
 
   renderSessions();

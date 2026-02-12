@@ -1,6 +1,6 @@
 /* ── Global state object ──────────────────────────────── */
 export const S = {
-  view:        'system', // 'system' | 'live' | sessionId
+  view:        'system', // 'system' | 'live' | 'models' | sessionId
   filter:      'all',
   autoScroll:  true,
   sessions:    [],
@@ -11,6 +11,7 @@ export const S = {
   theme:       'dark',   // 'dark' | 'light'
   lang:        'zh',     // 'en' | 'zh'
   systemData:  null,
+  modelsData:  null,
   systemTimer: null,
   sessionsTimer: null,
   gatewayOnline: null,

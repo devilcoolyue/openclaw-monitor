@@ -9,6 +9,7 @@ import os
 import select
 import socket
 import subprocess
+import tempfile
 import time
 from urllib.parse import urlparse
 
@@ -20,6 +21,104 @@ import logs
 import sessions
 import jsonl
 from sse import _begin_sse, _send_sse, _send_sse_heartbeat, _json_resp, _read_json_file
+
+
+def _json_resp_status(handler, obj, status=200):
+    body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+    handler.send_response(status)
+    handler.send_header('Content-Type', 'application/json')
+    handler.send_header('Content-Length', str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _split_model_ref(ref: str):
+    if not isinstance(ref, str) or '/' not in ref:
+        return '', ref or ''
+    provider, model_id = ref.split('/', 1)
+    return provider, model_id
+
+
+def _collect_model_options(cfg: dict):
+    opts = []
+    seen = set()
+
+    providers = cfg.get('models', {}).get('providers', {})
+    if isinstance(providers, dict):
+        for provider, pdata in providers.items():
+            models = pdata.get('models', []) if isinstance(pdata, dict) else []
+            if not isinstance(models, list):
+                continue
+            for m in models:
+                if not isinstance(m, dict):
+                    continue
+                model_id = m.get('id')
+                if not isinstance(model_id, str) or not model_id:
+                    continue
+                val = f'{provider}/{model_id}'
+                key = val.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                opts.append({
+                    'value': val,
+                    'provider': str(provider),
+                    'modelId': model_id,
+                    'name': m.get('name') or ''
+                })
+
+    defaults_models = cfg.get('agents', {}).get('defaults', {}).get('models', {})
+    if isinstance(defaults_models, dict):
+        for val in defaults_models.keys():
+            if not isinstance(val, str) or '/' not in val:
+                continue
+            key = val.lower()
+            if key in seen:
+                continue
+            provider, model_id = _split_model_ref(val)
+            seen.add(key)
+            opts.append({
+                'value': val,
+                'provider': provider,
+                'modelId': model_id,
+                'name': ''
+            })
+
+    current = cfg.get('agents', {}).get('defaults', {}).get('model', {}).get('primary')
+    if isinstance(current, str) and '/' in current and current.lower() not in seen:
+        provider, model_id = _split_model_ref(current)
+        opts.append({
+            'value': current,
+            'provider': provider,
+            'modelId': model_id,
+            'name': ''
+        })
+
+    opts.sort(key=lambda x: x['value'].lower())
+    return opts
+
+
+def _write_json_atomic(path: str, data):
+    file_mode = 0o600
+    try:
+        file_mode = os.stat(path).st_mode & 0o777
+    except OSError:
+        pass
+
+    parent = os.path.dirname(path) or '.'
+    fd, tmp_path = tempfile.mkstemp(prefix='.openclaw-monitor.', suffix='.json', dir=parent)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+            fh.write('\n')
+        os.chmod(tmp_path, file_mode)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -96,6 +195,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         if   path == '/api/sessions':            return self._api_sessions()
         elif path == '/api/health':              return self._api_health()
+        elif path == '/api/models':              return self._api_models()
         elif path == '/api/system':              return self._api_system()
         elif path == '/api/logs/stream':         return self._api_log_stream()
         elif path.startswith('/api/session/') and path.endswith('/stream'):
@@ -112,6 +212,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         if self._require_auth(api=True):
             return
+
+        if path == '/api/models/switch':
+            return self._api_models_switch()
 
         self.send_error(404, 'Not Found')
 
@@ -208,6 +311,132 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             'today_log_exists':   os.path.isfile(config.TODAY_LOG),
         }
         _json_resp(self, result)
+
+    # ── GET /api/models ─────────────────────────────────────
+    def _api_models(self):
+        cfg = _read_json_file(config.OPENCLAW_CONFIG)
+        if not isinstance(cfg, dict):
+            return _json_resp_status(self, {
+                'ok': False,
+                'error': f'Failed to parse config file: {config.OPENCLAW_CONFIG}'
+            }, 500)
+
+        current = cfg.get('agents', {}).get('defaults', {}).get('model', {}).get('primary')
+        _json_resp(self, {
+            'ok': True,
+            'configPath': config.OPENCLAW_CONFIG,
+            'current': current if isinstance(current, str) else '',
+            'options': _collect_model_options(cfg),
+        })
+
+    # ── POST /api/models/switch ─────────────────────────────
+    def _api_models_switch(self):
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+        except (json.JSONDecodeError, ValueError):
+            body = {}
+
+        target = body.get('target', '')
+        if not isinstance(target, str) or not target.strip():
+            return _json_resp_status(self, {'ok': False, 'error': 'Missing target model'}, 400)
+
+        requested = target.strip()
+        with config.MODEL_SWITCH_LOCK:
+            cfg = _read_json_file(config.OPENCLAW_CONFIG)
+            if not isinstance(cfg, dict):
+                return _json_resp_status(self, {
+                    'ok': False,
+                    'error': f'Failed to parse config file: {config.OPENCLAW_CONFIG}'
+                }, 500)
+
+            options = _collect_model_options(cfg)
+            option_map = {}
+            for opt in options:
+                val = opt.get('value')
+                if isinstance(val, str) and val:
+                    option_map[val.lower()] = val
+
+            canonical = option_map.get(requested.lower())
+            if not canonical:
+                return _json_resp_status(self, {
+                    'ok': False,
+                    'error': f'Target model not found: {requested}'
+                }, 400)
+
+            agents_cfg = cfg.setdefault('agents', {})
+            if not isinstance(agents_cfg, dict):
+                agents_cfg = {}
+                cfg['agents'] = agents_cfg
+            defaults = agents_cfg.setdefault('defaults', {})
+            if not isinstance(defaults, dict):
+                defaults = {}
+                agents_cfg['defaults'] = defaults
+
+            model_cfg = defaults.setdefault('model', {})
+            if not isinstance(model_cfg, dict):
+                model_cfg = {}
+                defaults['model'] = model_cfg
+
+            current = model_cfg.get('primary')
+            changed_primary = not isinstance(current, str) or current.lower() != canonical.lower()
+            model_cfg['primary'] = canonical
+
+            defaults_models = defaults.get('models')
+            if not isinstance(defaults_models, dict):
+                defaults_models = {}
+                defaults['models'] = defaults_models
+
+            has_case_insensitive = any(
+                isinstance(k, str) and k.lower() == canonical.lower()
+                for k in defaults_models.keys()
+            )
+            added_model_key = False
+            if not has_case_insensitive:
+                defaults_models[canonical] = {}
+                added_model_key = True
+
+            changed = changed_primary or added_model_key
+            if changed:
+                try:
+                    _write_json_atomic(config.OPENCLAW_CONFIG, cfg)
+                except OSError as e:
+                    return _json_resp_status(self, {
+                        'ok': False,
+                        'error': f'Failed to write config: {e}'
+                    }, 500)
+
+                try:
+                    p = subprocess.run(
+                        [config.OC_BIN, 'gateway', 'restart'],
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        env=config.OC_ENV
+                    )
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+                    return _json_resp_status(self, {
+                        'ok': False,
+                        'changed': True,
+                        'current': canonical,
+                        'error': f'Gateway restart failed: {e}'
+                    }, 500)
+
+                if p.returncode != 0:
+                    err = (p.stderr or p.stdout or '').strip() or 'Gateway restart failed'
+                    return _json_resp_status(self, {
+                        'ok': False,
+                        'changed': True,
+                        'current': canonical,
+                        'error': err
+                    }, 500)
+
+            _json_resp(self, {
+                'ok': True,
+                'changed': changed,
+                'current': canonical,
+                'gatewayRestarted': changed,
+            })
 
     # ── GET /api/system ────────────────────────────────────
     def _api_system(self):

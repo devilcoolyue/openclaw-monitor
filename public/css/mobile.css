@@ -134,4 +134,12 @@
   .sys-cron-meta{grid-area:meta;justify-content:flex-start}
   .sys-cron-toggle{grid-area:toggle;align-self:center}
   .sys-cron-meta-item{padding:2px 6px}
+
+  /* ── Model switch responsive ── */
+  .model-page{grid-template-columns:1fr;padding:12px}
+  .model-card-body{padding:10px 12px}
+  .model-switch-btn{width:100%}
+  .model-switch-modal-box{width:min(94vw,360px);padding:14px}
+  .model-switch-step{grid-template-columns:22px minmax(0,1fr)}
+  .model-switch-step-state{grid-column:2}
 }
