@@ -123,4 +123,15 @@
 
   /* ── System dashboard responsive ── */
   .sys-grid{grid-template-columns:1fr!important}
+  .sys-cron-summary{
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:
+      "main toggle"
+      "meta meta";
+    row-gap:8px;
+  }
+  .sys-cron-main{grid-area:main}
+  .sys-cron-meta{grid-area:meta;justify-content:flex-start}
+  .sys-cron-toggle{grid-area:toggle;align-self:center}
+  .sys-cron-meta-item{padding:2px 6px}
 }

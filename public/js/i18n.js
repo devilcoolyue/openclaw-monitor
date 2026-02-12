@@ -195,6 +195,8 @@ export const KEY_ZH = {
   version:'版本', socket:'套接字', path:'路径', agents:'代理', defaults:'默认值',
   lastNotifiedVersion:'最新通知版本', lastNotifiedTag:'最新通知标签', lastCheckedAt:'上次检查时间',
   name:'名称', channel:'通道', error:'错误', type:'类型', schedule:'计划',
+  createdAtMs:'创建时间(ms)', updatedAtMs:'更新时间(ms)',
+  sessionTarget:'会话目标', wakeMode:'唤醒模式', payload:'负载', delivery:'投递', state:'状态',
   command:'命令', enabled:'启用', lastRun:'上次运行', nextRun:'下次运行',
   compactionCount:'压缩次数', contextTokens:'上下文Tokens', totalTokens:'总Tokens', percent:'百分比',
   messages:'消息数', tokens:'Tokens', cost:'费用', cwd:'工作目录', pid:'进程ID',

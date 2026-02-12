@@ -39,6 +39,7 @@
 .sys-badge-ok{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(63,185,80,.15);color:var(--green);text-transform:uppercase}
 .sys-badge-warn{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(227,179,65,.12);color:var(--yellow);text-transform:uppercase}
 .sys-badge-err{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(255,123,114,.15);color:var(--red);text-transform:uppercase}
+.sys-badge-neutral{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:rgba(139,148,158,.16);color:var(--t2);text-transform:uppercase}
 .sys-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:var(--bg-3);border:1px solid var(--border);color:var(--t1);margin:2px}
 .sys-bar{height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden;margin:4px 0}
 .sys-bar-fill{height:100%;border-radius:3px;transition:width .3s}
@@ -49,3 +50,68 @@
 .sys-empty{color:var(--t3);font-size:11px;padding:8px 0;text-align:center}
 .sys-section-label{font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;padding:8px 0 3px;border-bottom:1px solid var(--border);margin-bottom:2px}
 .sys-section-label:first-child{padding-top:0}
+
+.sys-cron-list{display:flex;flex-direction:column;gap:10px}
+.sys-cron-item{
+  border:1px solid var(--border);border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0) 52%),var(--bg-2);
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+  transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease,background .18s ease;
+  overflow:hidden;
+}
+.sys-cron-item:hover{
+  border-color:rgba(88,166,255,.45);
+  box-shadow:0 10px 24px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.04);
+  transform:translateY(-1px);
+}
+.sys-cron-item[open]{
+  border-color:rgba(88,166,255,.55);
+  box-shadow:0 12px 28px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.05);
+}
+.sys-cron-summary{
+  display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;column-gap:10px;
+  padding:10px 12px;cursor:pointer;list-style:none;
+  transition:background .18s ease;
+}
+.sys-cron-summary::-webkit-details-marker{display:none}
+.sys-cron-summary::marker{content:''}
+.sys-cron-item:hover .sys-cron-summary{background:rgba(88,166,255,.06)}
+.sys-cron-item[open] .sys-cron-summary{background:rgba(88,166,255,.09)}
+.sys-cron-main{display:flex;align-items:center;gap:10px;min-width:0}
+.sys-cron-index{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:24px;height:24px;padding:0 7px;border-radius:999px;
+  border:1px solid rgba(88,166,255,.35);background:rgba(88,166,255,.14);
+  color:var(--accent);font-size:10px;font-weight:700;flex-shrink:0;
+}
+.sys-cron-name{
+  color:var(--t0);font-size:11px;font-weight:700;letter-spacing:.1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.sys-cron-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.sys-cron-meta-item{
+  display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--border);background:var(--bg-1);
+  border-radius:999px;padding:3px 7px;
+}
+.sys-cron-meta-label{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.3px}
+.sys-cron-toggle{
+  width:28px;height:28px;border-radius:999px;
+  border:1px solid var(--border);background:var(--bg-1);
+  display:inline-flex;align-items:center;justify-content:center;
+  color:var(--t2);transition:transform .18s ease,border-color .18s ease,color .18s ease,background .18s ease;
+}
+.sys-cron-toggle svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sys-cron-item:hover .sys-cron-toggle{border-color:rgba(88,166,255,.45);color:var(--accent)}
+.sys-cron-item[open] .sys-cron-toggle{
+  transform:rotate(90deg);
+  border-color:rgba(88,166,255,.65);
+  background:rgba(88,166,255,.12);
+  color:var(--accent);
+}
+.sys-cron-detail{
+  padding:0 12px 10px;border-top:1px solid transparent;
+  background:linear-gradient(180deg,rgba(88,166,255,.07),rgba(88,166,255,0) 62%);
+}
+.sys-cron-item[open] .sys-cron-detail{border-top-color:var(--border);padding-top:10px}
+.sys-cron-detail .sys-kv{padding:4px 0}

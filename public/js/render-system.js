@@ -391,15 +391,182 @@ function renderDevices(data) {
 
 function renderCronJobs(data) {
   if (!data) return `<span class="sys-empty">${i18n('sysNoData')}</span>`;
-  const jobs = data.jobs;
+  const jobs = Array.isArray(data.jobs) ? data.jobs : (Array.isArray(data) ? data : null);
   if (!jobs || !Array.isArray(jobs) || jobs.length === 0) return `<span class="sys-empty">${i18n('sysNoJobs')}</span>`;
-  return jobs.map(j => {
-    let h = '';
-    Object.keys(j).forEach(k => {
-      h += `<div class="sys-kv"><span class="sys-kv-key">${esc(translateKey(k))}</span><span class="sys-kv-val">${esc(String(j[k]))}</span></div>`;
-    });
-    return h;
-  }).join('<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">');
+
+  const isZh = S.lang === 'zh';
+  const labelKey = (k) => (/^\[\d+\]$/.test(k) ? k : translateKey(k));
+
+  const maybeParseStructuredText = (v) => {
+    if (typeof v !== 'string') return null;
+    const t = v.trim();
+    if (!(t.startsWith('{') || t.startsWith('['))) return null;
+    try {
+      const parsed = JSON.parse(t);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeValue = (v) => maybeParseStructuredText(v) || v;
+
+  const normalizeBoolean = (v) => {
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'number') return v === 1 ? true : (v === 0 ? false : null);
+    if (typeof v === 'string') {
+      const t = v.trim().toLowerCase();
+      if (['true', '1', 'yes', 'on', 'enabled', 'enable'].includes(t)) return true;
+      if (['false', '0', 'no', 'off', 'disabled', 'disable'].includes(t)) return false;
+    }
+    return null;
+  };
+
+  const renderScalar = (k, v) => {
+    if (v === null || v === undefined || v === '') return `<span class="sys-empty">—</span>`;
+    if (typeof v === 'boolean') {
+      return v
+        ? `<span class="sys-badge-ok">${S.lang==='zh'?'是':'true'}</span>`
+        : `<span class="sys-badge-warn">${S.lang==='zh'?'否':'false'}</span>`;
+    }
+    if (typeof v === 'number' && /(?:AtMs|TimestampMs|Ts)$/i.test(k) && Number.isFinite(v) && v > 100000000000) {
+      const dt = new Date(v);
+      if (!Number.isNaN(dt.getTime())) {
+        return `${v} <span style="font-size:10px;color:var(--t3)">${esc(dt.toLocaleString())}</span>`;
+      }
+    }
+    return esc(String(v));
+  };
+
+  const statusClass = (raw) => {
+    const s = String(raw || '').toLowerCase();
+    if (/(success|succeeded|ok|done|complete|completed|finish|finished|delivered|sent|healthy|pass|成功|完成|已发送|通过|正常)/.test(s)) return 'ok';
+    if (/(fail|failed|error|abort|aborted|timeout|timed out|reject|rejected|cancel|canceled|exception|fatal|失败|错误|异常|中断|拒绝|超时)/.test(s)) return 'err';
+    if (/(running|pending|queued|waiting|retry|processing|进行|排队|等待|重试)/.test(s)) return 'warn';
+    return 'warn';
+  };
+
+  const statusTextFromAny = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      const t = value.trim();
+      return t || null;
+    }
+    if (typeof value === 'boolean') return value ? (isZh ? '成功' : 'success') : (isZh ? '失败' : 'failed');
+    if (typeof value === 'number') return String(value);
+    if (typeof value !== 'object') return String(value);
+
+    const normalized = normalizeValue(value);
+    if (!normalized || typeof normalized !== 'object') return null;
+
+    const keys = ['status', 'state', 'result', 'outcome', 'lastStatus', 'lastRunStatus', 'lastResult', 'message', 'error'];
+    for (const key of keys) {
+      if (normalized[key] === undefined || normalized[key] === null) continue;
+      const next = statusTextFromAny(normalized[key]);
+      if (next) return next;
+    }
+    if (normalized.ok === true || normalized.success === true || normalized.succeeded === true) return isZh ? '成功' : 'success';
+    if (normalized.ok === false || normalized.success === false || normalized.succeeded === false || normalized.failed === true) return isZh ? '失败' : 'failed';
+    return null;
+  };
+
+  const getPath = (obj, path) => {
+    const parts = path.split('.');
+    let cur = obj;
+    for (const p of parts) {
+      if (!cur || typeof cur !== 'object') return undefined;
+      cur = cur[p];
+    }
+    return cur;
+  };
+
+  const extractLastRunStatus = (job) => {
+    const state = normalizeValue(job?.state);
+    const delivery = normalizeValue(job?.delivery);
+    const candidates = [
+      job?.lastRunStatus, job?.last_status, job?.lastStatus, job?.lastRunState, job?.lastRunResult, job?.lastResult,
+      getPath(job, 'lastRun.status'), getPath(job, 'lastRun.state'), getPath(job, 'lastRun.result'),
+      state?.lastRunStatus, state?.lastStatus, state?.status, state?.result, state?.lastResult,
+      getPath(state, 'lastRun.status'), getPath(state, 'lastRun.state'), getPath(state, 'lastRun.result'),
+      delivery?.lastRunStatus, delivery?.lastStatus, delivery?.status, delivery?.result
+    ];
+    for (const candidate of candidates) {
+      const text = statusTextFromAny(candidate);
+      if (text) return text;
+    }
+    return null;
+  };
+
+  const renderEnabledBadge = (enabledRaw) => {
+    const enabled = normalizeBoolean(enabledRaw);
+    if (enabled === true) return `<span class="sys-badge-ok">${isZh ? '启用' : 'enabled'}</span>`;
+    if (enabled === false) return `<span class="sys-badge-warn">${isZh ? '禁用' : 'disabled'}</span>`;
+    return `<span class="sys-badge-neutral">${isZh ? '未知' : 'unknown'}</span>`;
+  };
+
+  const renderLastRunBadge = (job) => {
+    const text = extractLastRunStatus(job);
+    if (!text) return `<span class="sys-badge-neutral">${isZh ? '未执行' : 'not-run'}</span>`;
+    return `<span class="sys-badge-${statusClass(text)}">${esc(text)}</span>`;
+  };
+
+  const renderField = (k, rawValue, depth = 0) => {
+    const value = normalizeValue(rawValue);
+    const keyStyle = depth > 0 ? ` style="padding-left:${depth * 14}px;color:var(--t2)"` : '';
+    const keyHtml = esc(labelKey(k));
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return `<div class="sys-kv"><span class="sys-kv-key"${keyStyle}>${keyHtml}</span><span class="sys-kv-val"><span class="sys-empty">[]</span></span></div>`;
+      }
+      const scalarOnly = value.every(item => item === null || item === undefined || typeof item !== 'object');
+      if (scalarOnly) {
+        const joined = value.map(item => item === null || item === undefined ? '—' : String(item)).join(', ');
+        return `<div class="sys-kv"><span class="sys-kv-key"${keyStyle}>${keyHtml}</span><span class="sys-kv-val">${esc(joined)}</span></div>`;
+      }
+      let h = `<div class="sys-kv"><span class="sys-kv-key"${keyStyle}>${keyHtml}</span><span class="sys-kv-val"><span class="sys-tag">${value.length} ${S.lang==='zh'?'项':'items'}</span></span></div>`;
+      value.forEach((item, idx) => { h += renderField(`[${idx}]`, item, depth + 1); });
+      return h;
+    }
+
+    if (value && typeof value === 'object') {
+      const entries = Object.entries(value);
+      if (entries.length === 0) {
+        return `<div class="sys-kv"><span class="sys-kv-key"${keyStyle}>${keyHtml}</span><span class="sys-kv-val"><span class="sys-empty">{}</span></span></div>`;
+      }
+      let h = `<div class="sys-kv"><span class="sys-kv-key"${keyStyle}>${keyHtml}</span><span class="sys-kv-val"><span class="sys-tag">${entries.length} ${S.lang==='zh'?'个字段':'fields'}</span></span></div>`;
+      entries.forEach(([childKey, childValue]) => { h += renderField(childKey, childValue, depth + 1); });
+      return h;
+    }
+
+    return `<div class="sys-kv"><span class="sys-kv-key"${keyStyle}>${keyHtml}</span><span class="sys-kv-val">${renderScalar(k, value)}</span></div>`;
+  };
+
+  const items = jobs.map((job, idx) => {
+    const title = job && typeof job === 'object'
+      ? (job.name || job.title || job.id || `${isZh ? '任务' : 'Job'} #${idx + 1}`)
+      : `${isZh ? '任务' : 'Job'} #${idx + 1}`;
+
+    let body = '';
+    if (!job || typeof job !== 'object') {
+      body = `<div class="sys-kv"><span class="sys-kv-key">${isZh ? '值' : 'Value'}</span><span class="sys-kv-val">${esc(String(job))}</span></div>`;
+    } else {
+      Object.entries(job).forEach(([k, v]) => { body += renderField(k, v, 0); });
+    }
+    return `<details class="sys-cron-item">
+      <summary class="sys-cron-summary">
+        <span class="sys-cron-main"><span class="sys-cron-index">${idx + 1}</span><span class="sys-cron-name">${esc(String(title))}</span></span>
+        <span class="sys-cron-meta">
+          <span class="sys-cron-meta-item"><span class="sys-cron-meta-label">${isZh ? '启用' : 'Enabled'}</span>${renderEnabledBadge(job && typeof job === 'object' ? job.enabled : null)}</span>
+          <span class="sys-cron-meta-item"><span class="sys-cron-meta-label">${isZh ? '上次执行' : 'Last run'}</span>${renderLastRunBadge(job)}</span>
+        </span>
+        <span class="sys-cron-toggle" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></span>
+      </summary>
+      <div class="sys-cron-detail">${body || `<span class="sys-empty">${i18n('sysNoData')}</span>`}</div>
+    </details>`;
+  }).join('');
+
+  return `<div class="sys-cron-list">${items}</div>`;
 }
 
 function renderUpdateCheck(data) {
